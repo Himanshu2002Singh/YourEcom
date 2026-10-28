@@ -1,5 +1,7 @@
 import type { Product } from '@/types/store';
 
+export const categories = ['Face Masks', 'Gloves', 'Syringes', 'IV Sets', 'Bandages', 'Gauze & Cotton'] as const;
+
 export const products: Product[] = [
   {
     id: 1,
@@ -19,7 +21,7 @@ export const products: Product[] = [
     price: 549,
     unit: 'Box of 100',
     badge: 'Popular',
-    image: 'https://images.pexels.com/photos/11069119/pexels-photo-11069119.jpeg?auto=compress&cs=tinysrgb&w=1000',
+    image: 'https://images.pexels.com/photos/7856715/pexels-photo-7856715.jpeg?auto=compress&cs=tinysrgb&w=1000',
     description: 'Powder-free nitrile gloves designed for a secure fit, excellent dexterity and hygienic everyday protection.',
     features: ['Powder-free finish', 'Latex-free material', 'Textured fingertips'],
   },
@@ -40,7 +42,7 @@ export const products: Product[] = [
     price: 899,
     unit: 'Pack of 25',
     badge: 'New',
-    image: 'https://images.pexels.com/photos/33394283/pexels-photo-33394283.jpeg?auto=compress&cs=tinysrgb&w=1000',
+    image: 'https://images.pexels.com/photos/6191530/pexels-photo-6191530.jpeg?auto=compress&cs=tinysrgb&w=1000',
     description: 'High-quality administration sets for dependable fluid delivery and easy clinical handling.',
     features: ['Leak-resistant connectors', 'Sterile and ready to use', 'Smooth flow chamber'],
   },
@@ -50,7 +52,7 @@ export const products: Product[] = [
     category: 'Gauze & Cotton',
     price: 299,
     unit: 'Pack of 12',
-    image: 'https://images.pexels.com/photos/7722790/pexels-photo-7722790.jpeg?auto=compress&cs=tinysrgb&w=1000',
+    image: 'https://images.pexels.com/photos/5721552/pexels-photo-5721552.jpeg?auto=compress&cs=tinysrgb&w=1000',
     description: 'Soft, absorbent gauze rolls for cleaning, dressing and everyday first-aid care.',
     features: ['Highly absorbent cotton', 'Soft skin-friendly weave', 'Easy tear roll format'],
   },
@@ -60,10 +62,8 @@ export const products: Product[] = [
     category: 'Bandages',
     price: 179,
     unit: 'Pack of 50',
-    image: 'https://images.pexels.com/photos/5994632/pexels-photo-5994632.jpeg?auto=compress&cs=tinysrgb&w=1000',
+    image: 'https://images.pexels.com/photos/7722845/pexels-photo-7722845.jpeg?auto=compress&cs=tinysrgb&w=1000',
     description: 'Reliable adhesive bandages for small cuts, scrapes and daily first-aid kits.',
     features: ['Flexible fabric backing', 'Secure skin-friendly adhesive', 'Individual hygienic wraps'],
   },
 ];
-
-export const categories = ['All products', 'Face Masks', 'Gloves', 'Syringes', 'IV Sets', 'Bandages', 'Gauze & Cotton'];
