@@ -6,6 +6,7 @@ type QuantityStepperProps = {
   quantity: number;
   onChange: (quantity: number) => void;
   label: string;
+  max?: number; // what's in stock; never above MAX_QUANTITY
   size?: 'sm' | 'md' | 'lg';
   tone?: 'brand' | 'light' | 'dark';
 };
@@ -24,8 +25,9 @@ const tones = {
 
 // − [qty] + control used wherever a cart quantity is shown. At 1 the minus becomes a bin that removes
 // the item, and the number can be typed for bulk orders (empty or 0 falls back to the current value).
-export function QuantityStepper({ quantity, onChange, label, size = 'md', tone = 'brand' }: QuantityStepperProps) {
+export function QuantityStepper({ quantity, onChange, label, max = MAX_QUANTITY, size = 'md', tone = 'brand' }: QuantityStepperProps) {
   const [draft, setDraft] = useState<string | null>(null);
+  const limit = Math.min(max, MAX_QUANTITY);
   const { box, button, input, icon } = sizes[size];
   const colors = tones[tone];
   const buttonClass = `flex h-full ${button} shrink-0 items-center justify-center rounded-full transition ${colors.button} disabled:opacity-40 disabled:hover:bg-transparent`;
@@ -60,7 +62,7 @@ export function QuantityStepper({ quantity, onChange, label, size = 'md', tone =
         aria-label={`Quantity of ${label}`}
         className={`${input} bg-transparent text-center font-black outline-none`}
       />
-      <button type="button" onClick={() => onChange(quantity + 1)} disabled={quantity >= MAX_QUANTITY} aria-label={`Increase ${label} quantity`} className={buttonClass}>
+      <button type="button" onClick={() => onChange(quantity + 1)} disabled={quantity >= limit} aria-label={`Increase ${label} quantity`} className={buttonClass}>
         <Plus size={icon} />
       </button>
     </div>

@@ -13,7 +13,7 @@ type CheckoutPageProps = {
   user: User;
   savedDelivery?: DeliveryDetails;
   setQuantity: (id: number, quantity: number) => void;
-  placeOrder: (delivery: DeliveryDetails, paymentMethod: PaymentMethod) => Order;
+  placeOrder: (delivery: DeliveryDetails, paymentMethod: PaymentMethod) => Promise<Order>;
 };
 
 type Field = keyof DeliveryDetails;
@@ -73,10 +73,13 @@ export function CheckoutPage({ cart, cartTotal, user, savedDelivery, setQuantity
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
   const [form, setForm] = useState<DeliveryDetails>(savedDelivery ?? { name: user.name, phone: '', address: '', city: '', pincode: '' });
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
+  const [placing, setPlacing] = useState(false);
+  const [orderError, setOrderError] = useState('');
   usePageTitle(placedOrder ? 'Order confirmed' : 'Checkout');
 
   if (placedOrder) return <OrderConfirmation order={placedOrder} />;
-  if (cart.length === 0) return <EmptyCheckout />;
+  // While an order is being placed the cart empties just before the confirmation arrives.
+  if (cart.length === 0 && !placing) return <EmptyCheckout />;
 
   const total = cartTotal + deliveryFeeFor(cartTotal);
 
@@ -109,6 +112,19 @@ export function CheckoutPage({ cart, cartTotal, user, savedDelivery, setQuantity
     }
     setForm(trimmed);
     setStep(2);
+  };
+
+  // The backend prices the order and answers with it, or with a message to show if it refuses.
+  const submitOrder = async (): Promise<void> => {
+    setPlacing(true);
+    setOrderError('');
+    try {
+      setPlacedOrder(await placeOrder(form, paymentMethod));
+    } catch (error) {
+      setOrderError(error instanceof Error ? error.message : 'Something went wrong. Try again.');
+    } finally {
+      setPlacing(false);
+    }
   };
 
   return (
@@ -183,9 +199,18 @@ export function CheckoutPage({ cart, cartTotal, user, savedDelivery, setQuantity
                   );
                 })}
               </fieldset>
-              <button onClick={() => setPlacedOrder(placeOrder(form, paymentMethod))} className="mt-7 w-full rounded-full bg-[#0b6fce] py-4 font-extrabold text-white transition hover:bg-[#082b62]">
-                Place order · {formatPrice(total)}
+              <button
+                onClick={submitOrder}
+                disabled={placing}
+                className="mt-7 w-full rounded-full bg-[#0b6fce] py-4 font-extrabold text-white transition hover:bg-[#082b62] disabled:cursor-wait disabled:opacity-60"
+              >
+                {placing ? 'Placing your order…' : `Place order · ${formatPrice(total)}`}
               </button>
+              {orderError && (
+                <p role="alert" className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+                  {orderError}
+                </p>
+              )}
               <p className="mt-4 flex items-center justify-center gap-2 text-xs font-semibold text-slate-400">
                 <LockKeyhole size={14} /> Your payment information is protected
               </p>
@@ -236,7 +261,7 @@ function OrderSummary({ cart, cartTotal, setQuantity }: { cart: CartItem[]; cart
                 {formatPrice(item.price)} · {item.unit}
               </p>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <QuantityStepper quantity={item.quantity} onChange={(next: number) => setQuantity(item.id, next)} label={item.name} size="sm" tone="dark" />
+                <QuantityStepper quantity={item.quantity} onChange={(next: number) => setQuantity(item.id, next)} label={item.name} max={item.stock} size="sm" tone="dark" />
                 <span className="ml-auto text-sm font-black">{formatPrice(item.price * item.quantity)}</span>
               </div>
             </div>

@@ -1,0 +1,32 @@
+import { HttpError } from '../utils/HttpError.js';
+
+// Allows each signed-in customer `limit` requests per `windowMs`, then answers 429 with
+// Retry-After. Use it after requireUser. Customers are counted by account, not by IP:
+// behind a proxy many customers can share an IP address. Routes without a customer pass
+// `key`, which names whose allowance a request uses (sign-in counts per email address).
+// Counts live in this process's memory (the API runs as one long-lived Node process).
+export function rateLimit({ limit, windowMs, key = request => request.user.id }) {
+  const windows = new Map(); // key -> { count, resetAt }
+
+  return function limitRate(request, response, next) {
+    const now = Date.now();
+    if (windows.size > 1000) {
+      for (const [id, window] of windows) if (window.resetAt <= now) windows.delete(id);
+    }
+    const id = key(request);
+    let window = windows.get(id);
+    if (!window || window.resetAt <= now) {
+      window = { count: 0, resetAt: now + windowMs };
+      windows.set(id, window);
+    }
+    window.count += 1;
+    if (window.count > limit) {
+      const wait = Math.ceil((window.resetAt - now) / 1000);
+      response.set('Retry-After', String(wait));
+      throw new HttpError(429, wait > 90
+        ? `You’ve done that a lot. Try again in ${Math.ceil(wait / 60)} minutes.`
+        : 'You’re going a bit fast. Wait a few seconds and try again.');
+    }
+    next();
+  };
+}

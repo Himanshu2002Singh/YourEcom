@@ -3,29 +3,46 @@ import { Link } from 'react-router';
 import { PackageOpen, ShoppingBag, Truck } from 'lucide-react';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { formatPrice } from '@/lib/pricing';
-import type { CartItem, Order, OrderStatus } from '@/types/store';
+import type { Order, OrderItem, OrderStatus } from '@/types/store';
 
-type OrdersPageProps = { orders: Order[]; buyAgain: (order: Order) => void };
+type OrdersPageProps = { orders: Order[]; buyAgain: (order: Order) => void; cancelOrder: (id: string) => Promise<void> };
 type Filter = 'all' | OrderStatus;
 
 const filters: [Filter, string][] = [
   ['all', 'All orders'],
   ['Processing', 'In progress'],
   ['Delivered', 'Delivered'],
+  ['Cancelled', 'Cancelled'],
 ];
 
 const statusStyles: Record<OrderStatus, string> = {
   Processing: 'bg-sky-50 text-[#0b6fce]',
   Delivered: 'bg-emerald-50 text-[#159a7a]',
+  Cancelled: 'bg-slate-100 text-slate-500',
+};
+
+const deliveryLabels: Record<OrderStatus, string> = {
+  Processing: 'Delivering to',
+  Delivered: 'Delivered to',
+  Cancelled: 'Was to be delivered to',
 };
 
 const formatDate = (iso: string): string => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 const matchesFilter = (order: Order, filter: Filter): boolean => filter === 'all' || order.status === filter;
 
-export function OrdersPage({ orders, buyAgain }: OrdersPageProps) {
+export function OrdersPage({ orders, buyAgain, cancelOrder }: OrdersPageProps) {
   const [filter, setFilter] = useState<Filter>('all');
+  const [confirming, setConfirming] = useState<string | null>(null); // the order asking "cancel it?"
+  const [cancelling, setCancelling] = useState(false);
   usePageTitle('My orders');
   const visibleOrders = orders.filter((order: Order) => matchesFilter(order, filter));
+
+  const confirmCancel = async (id: string): Promise<void> => {
+    setCancelling(true);
+    await cancelOrder(id);
+    setCancelling(false);
+    setConfirming(null);
+  };
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-10 lg:px-8">
@@ -77,7 +94,7 @@ export function OrdersPage({ orders, buyAgain }: OrdersPageProps) {
                 </div>
               </div>
               <ul className="divide-y divide-slate-100">
-                {order.items.map((item: CartItem) => (
+                {order.items.map((item: OrderItem) => (
                   <li key={item.id} className="flex items-center gap-4 py-4">
                     <img src={item.image} alt={item.name} className="h-16 w-16 shrink-0 rounded-2xl object-cover" />
                     {/* Line total sits under the details on phones and on the right from sm up. */}
@@ -96,11 +113,39 @@ export function OrdersPage({ orders, buyAgain }: OrdersPageProps) {
               <div className="flex flex-col justify-between gap-4 border-t border-slate-100 pt-5 sm:flex-row sm:items-center">
                 <p className="flex items-center gap-2 text-sm font-semibold text-slate-500">
                   <Truck size={16} className="shrink-0 text-[#0b6fce]" />
-                  {order.status === 'Delivered' ? 'Delivered to' : 'Delivering to'} {order.delivery.name}, {order.delivery.city}
+                  {deliveryLabels[order.status]} {order.delivery.name}, {order.delivery.city}
                 </p>
-                <button onClick={() => buyAgain(order)} className="shrink-0 self-start rounded-full border border-slate-200 px-4 py-2 text-sm font-extrabold text-[#0b6fce] transition hover:bg-sky-50 sm:self-auto">
-                  Buy again
-                </button>
+                <div className="flex shrink-0 flex-wrap gap-2 self-start sm:self-auto">
+                  {order.status === 'Processing' &&
+                    (confirming === order.id ? (
+                      <>
+                        <button
+                          onClick={() => void confirmCancel(order.id)}
+                          disabled={cancelling}
+                          className="rounded-full bg-rose-600 px-4 py-2 text-sm font-extrabold text-white transition hover:bg-rose-700 disabled:opacity-60"
+                        >
+                          {cancelling ? 'Cancelling…' : 'Yes, cancel order'}
+                        </button>
+                        <button
+                          onClick={() => setConfirming(null)}
+                          disabled={cancelling}
+                          className="rounded-full border border-slate-200 px-4 py-2 text-sm font-extrabold text-slate-500 transition hover:text-[#082b62]"
+                        >
+                          Keep it
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => setConfirming(order.id)}
+                        className="rounded-full border border-slate-200 px-4 py-2 text-sm font-extrabold text-slate-500 transition hover:border-rose-200 hover:text-rose-600"
+                      >
+                        Cancel order
+                      </button>
+                    ))}
+                  <button onClick={() => buyAgain(order)} className="rounded-full border border-slate-200 px-4 py-2 text-sm font-extrabold text-[#0b6fce] transition hover:bg-sky-50">
+                    Buy again
+                  </button>
+                </div>
               </div>
             </article>
           ))}

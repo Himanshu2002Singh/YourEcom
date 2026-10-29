@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ChangeEvent } from 'react';
 import { Link } from 'react-router';
 import {
   ArrowRight,
@@ -22,8 +22,8 @@ import {
   Youtube,
   type LucideIcon,
 } from 'lucide-react';
-import { ProductCard } from '@/components/StoreShared';
-import { categories, products } from '@/data/products';
+import { LoadError, Loading, ProductCard, type ShopActions } from '@/components/StoreShared';
+import { categories } from '@/data/categories';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import type { Category, Product } from '@/types/store';
 
@@ -38,6 +38,23 @@ const categoryStyles: Record<Category, { icon: LucideIcon; tone: string }> = {
   'Gauze & Cotton': { icon: Layers, tone: 'bg-teal-50 text-teal-700' },
 };
 
+type Sort = 'featured' | 'price-low' | 'price-high' | 'name';
+
+const sortOptions: [Sort, string][] = [
+  ['featured', 'Featured'],
+  ['price-low', 'Price: low to high'],
+  ['price-high', 'Price: high to low'],
+  ['name', 'Name: A to Z'],
+];
+
+// 'featured' keeps the catalogue's own order (sort is stable).
+const compareBy: Record<Sort, (a: Product, b: Product) => number> = {
+  featured: () => 0,
+  'price-low': (a: Product, b: Product) => a.price - b.price,
+  'price-high': (a: Product, b: Product) => b.price - a.price,
+  name: (a: Product, b: Product) => a.name.localeCompare(b.name),
+};
+
 const reasons = [
   ['01', 'Quality checked', 'Every product is sourced from trusted manufacturers.'],
   ['02', 'Made for bulk', 'Flexible pricing for hospitals and growing practices.'],
@@ -45,27 +62,30 @@ const reasons = [
   ['04', 'Quick dispatch', 'Orders packed carefully and sent out on time.'],
 ];
 
-type HomePageProps = {
-  quantityOf: (id: number) => number;
-  addToCart: (product: Product) => void;
-  setQuantity: (id: number, quantity: number) => void;
+type HomePageProps = ShopActions & {
+  products: Product[] | null; // null while the catalogue loads from the API
+  catalogueError: string;
+  reloadProducts: () => void;
   search: string;
   setSearch: (search: string) => void;
 };
 
-export function HomePage({ quantityOf, addToCart, setQuantity, search, setSearch }: HomePageProps) {
+export function HomePage({ products, catalogueError, reloadProducts, search, setSearch, ...shop }: HomePageProps) {
   const [activeCategory, setActiveCategory] = useState<Category | typeof ALL_PRODUCTS>(ALL_PRODUCTS);
+  const [sort, setSort] = useState<Sort>('featured');
   const query = search.trim().toLowerCase();
   const filtering = query !== '' || activeCategory !== ALL_PRODUCTS;
   usePageTitle();
   const filteredProducts = useMemo(
     () =>
-      products.filter(
-        (product: Product) =>
-          (activeCategory === ALL_PRODUCTS || product.category === activeCategory) &&
-          [product.name, product.category, product.description].some((text: string) => text.toLowerCase().includes(query)),
-      ),
-    [activeCategory, query],
+      (products ?? [])
+        .filter(
+          (product: Product) =>
+            (activeCategory === ALL_PRODUCTS || product.category === activeCategory) &&
+            [product.name, product.category, product.description].some((text: string) => text.toLowerCase().includes(query)),
+        )
+        .sort(compareBy[sort]),
+    [products, activeCategory, query, sort],
   );
 
   const showCategory = (category: Category): void => {
@@ -175,7 +195,7 @@ export function HomePage({ quantityOf, addToCart, setQuantity, search, setSearch
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {categories.map((category: Category) => {
             const { icon: Icon, tone } = categoryStyles[category];
-            const count = products.filter((product: Product) => product.category === category).length;
+            const count = products?.filter((product: Product) => product.category === category).length;
             return (
               <button
                 key={category}
@@ -187,7 +207,7 @@ export function HomePage({ quantityOf, addToCart, setQuantity, search, setSearch
                 </div>
                 <p className="font-extrabold text-[#082b62]">{category}</p>
                 <p className="mt-1 text-xs font-semibold text-slate-400">
-                  {count} {count === 1 ? 'product' : 'products'}
+                  {count === undefined ? 'Loading…' : `${count} ${count === 1 ? 'product' : 'products'}`}
                 </p>
               </button>
             );
@@ -199,19 +219,35 @@ export function HomePage({ quantityOf, addToCart, setQuantity, search, setSearch
         <div className="mx-auto max-w-7xl px-5 lg:px-8">
           <p className="mb-2 text-sm font-extrabold uppercase tracking-[0.18em] text-[#159a7a]">Customer favourites</p>
           <h2 className="text-3xl font-black tracking-tight text-[#082b62] sm:text-4xl">Quality supplies, honest prices</h2>
-          <div className="mb-8 mt-6 flex flex-wrap gap-2 text-sm font-bold">
-            {[ALL_PRODUCTS, ...categories].map((category) => (
-              <button
-                key={category}
-                onClick={() => setActiveCategory(category)}
-                aria-pressed={activeCategory === category}
-                className={`whitespace-nowrap rounded-full px-4 py-2 transition ${activeCategory === category ? 'bg-[#082b62] text-white' : 'bg-white text-slate-500 hover:text-[#082b62]'}`}
+          <div className="mb-8 mt-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex flex-wrap gap-2 text-sm font-bold">
+              {[ALL_PRODUCTS, ...categories].map((category) => (
+                <button
+                  key={category}
+                  onClick={() => setActiveCategory(category)}
+                  aria-pressed={activeCategory === category}
+                  className={`whitespace-nowrap rounded-full px-4 py-2 transition ${activeCategory === category ? 'bg-[#082b62] text-white' : 'bg-white text-slate-500 hover:text-[#082b62]'}`}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+            <label className="flex shrink-0 items-center gap-2 text-sm font-bold text-slate-500">
+              Sort by
+              <select
+                value={sort}
+                onChange={(event: ChangeEvent<HTMLSelectElement>) => setSort(event.target.value as Sort)}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 font-extrabold text-[#082b62] outline-none transition focus:border-[#0b6fce]"
               >
-                {category}
-              </button>
-            ))}
+                {sortOptions.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
-          {filtering && (
+          {filtering && products && (
             <p className="-mt-3 mb-6 text-sm font-semibold text-slate-500">
               Showing {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
               {activeCategory !== ALL_PRODUCTS && (
@@ -229,10 +265,12 @@ export function HomePage({ quantityOf, addToCart, setQuantity, search, setSearch
               </button>
             </p>
           )}
-          {filteredProducts.length > 0 ? (
+          {!products ? (
+            catalogueError ? <LoadError message={catalogueError} retry={reloadProducts} /> : <Loading label="Loading products…" />
+          ) : filteredProducts.length > 0 ? (
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {filteredProducts.map((product: Product) => (
-                <ProductCard key={product.id} product={product} quantity={quantityOf(product.id)} addToCart={addToCart} setQuantity={setQuantity} />
+                <ProductCard key={product.id} product={product} {...shop} />
               ))}
             </div>
           ) : (

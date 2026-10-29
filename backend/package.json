@@ -1,0 +1,20 @@
+{
+  "name": "yourecom-backend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "YourEcom API: customer accounts, the medical-supplies catalogue and orders.",
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env --watch server.js",
+    "start": "node --env-file-if-exists=.env server.js",
+    "db:setup": "node --env-file-if-exists=.env db/setup.js",
+    "test": "node --env-file-if-exists=.env --test \"test/**/*.test.js\""
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "mysql2": "^3.24.5"
+  }
+}

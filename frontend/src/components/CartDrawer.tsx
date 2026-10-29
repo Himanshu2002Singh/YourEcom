@@ -108,7 +108,7 @@ export function CartDrawer({ open, cart, cartCount, cartTotal, setOpen, setQuant
                       {formatPrice(item.price)} · {item.unit}
                     </p>
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                      <QuantityStepper quantity={item.quantity} onChange={(next: number) => setQuantity(item.id, next)} label={item.name} size="sm" tone="light" />
+                      <QuantityStepper quantity={item.quantity} onChange={(next: number) => setQuantity(item.id, next)} label={item.name} max={item.stock} size="sm" tone="light" />
                       <span className="ml-auto font-black text-[#082b62]">{formatPrice(item.price * item.quantity)}</span>
                     </div>
                   </div>

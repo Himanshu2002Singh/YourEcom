@@ -5,18 +5,13 @@ import { TextField } from '@/components/TextField';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import type { User } from '@/types/store';
 
-type LoginPageProps = { user: User | null; signIn: (name: string, email: string) => void };
 type Mode = 'login' | 'signup';
 type Field = 'name' | 'email' | 'password';
-
-// "aarav.singh@example.com" -> "Aarav Singh"; used when signing in without a name field.
-const nameFromEmail = (email: string): string =>
-  email
-    .split('@')[0]
-    .split(/[._-]+/)
-    .filter(Boolean)
-    .map((part: string) => part[0].toUpperCase() + part.slice(1))
-    .join(' ') || email;
+type LoginPageProps = {
+  user: User | null | undefined; // undefined while the session is being checked
+  // Signs in or creates the account through the API; rejects with a message to show.
+  signIn: (details: { mode: Mode } & Record<Field, string>) => Promise<void>;
+};
 
 const errorFor = (field: Field, value: string): string | undefined => {
   if (field === 'name') return value.trim() ? undefined : 'Enter your full name';
@@ -31,6 +26,8 @@ export function LoginPage({ user, signIn }: LoginPageProps) {
   const [values, setValues] = useState<Record<Field, string>>({ name: '', email: '', password: '' });
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
   const [showPassword, setShowPassword] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [formError, setFormError] = useState('');
   const isLogin = mode === 'login';
   usePageTitle(isLogin ? 'Sign in' : 'Create account');
 
@@ -47,9 +44,10 @@ export function LoginPage({ user, signIn }: LoginPageProps) {
   const switchMode = (next: Mode): void => {
     setMode(next);
     setErrors({});
+    setFormError('');
   };
 
-  const submit = (event: FormEvent<HTMLFormElement>): void => {
+  const submit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
     const fields: Field[] = isLogin ? ['email', 'password'] : ['name', 'email', 'password'];
     const nextErrors: Partial<Record<Field, string>> = {};
@@ -62,8 +60,15 @@ export function LoginPage({ user, signIn }: LoginPageProps) {
       document.getElementById(firstInvalid)?.focus();
       return;
     }
-    const email = values.email.trim().toLowerCase();
-    signIn(isLogin ? nameFromEmail(email) : values.name.trim(), email);
+    setPending(true);
+    setFormError('');
+    try {
+      // On success the user prop arrives and the redirect above takes over.
+      await signIn({ mode, name: values.name.trim(), email: values.email.trim().toLowerCase(), password: values.password });
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Something went wrong. Try again.');
+      setPending(false);
+    }
   };
 
   return (
@@ -145,8 +150,17 @@ export function LoginPage({ user, signIn }: LoginPageProps) {
                 </button>
               }
             />
-            <button type="submit" className="w-full rounded-full bg-[#0b6fce] py-4 font-extrabold text-white transition hover:bg-[#082b62]">
-              {isLogin ? 'Sign in to YourEcom' : 'Create my account'}
+            {formError && (
+              <p role="alert" className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+                {formError}
+              </p>
+            )}
+            <button
+              type="submit"
+              disabled={pending}
+              className="w-full rounded-full bg-[#0b6fce] py-4 font-extrabold text-white transition hover:bg-[#082b62] disabled:cursor-wait disabled:opacity-60"
+            >
+              {pending ? 'Please wait…' : isLogin ? 'Sign in to YourEcom' : 'Create my account'}
             </button>
           </form>
           <p className="mt-6 text-center text-sm font-semibold text-slate-400">By continuing, you agree to our terms and privacy policy.</p>
