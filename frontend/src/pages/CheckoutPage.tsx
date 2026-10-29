@@ -1,11 +1,12 @@
 import { Fragment, useState, type ChangeEvent, type FocusEvent, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { ArrowLeft, ArrowRight, Check, CreditCard, LockKeyhole, MapPin, PackageCheck, ShoppingCart, type LucideIcon } from 'lucide-react';
+import { CouponBox } from '@/components/CouponBox';
 import { QuantityStepper } from '@/components/QuantityStepper';
 import { TextField } from '@/components/TextField';
 import { usePageTitle } from '@/hooks/usePageTitle';
-import { FREE_DELIVERY_THRESHOLD, deliveryFeeFor, formatPrice } from '@/lib/pricing';
-import type { CartItem, DeliveryDetails, Order, PaymentMethod, User } from '@/types/store';
+import { FREE_DELIVERY_THRESHOLD, deliveryFeeFor, discountFor, formatPrice } from '@/lib/pricing';
+import type { CartItem, Coupon, DeliveryDetails, Order, PaymentMethod, User } from '@/types/store';
 
 type CheckoutPageProps = {
   cart: CartItem[];
@@ -13,8 +14,10 @@ type CheckoutPageProps = {
   user: User;
   savedDelivery?: DeliveryDetails;
   setQuantity: (id: number, quantity: number) => void;
-  placeOrder: (delivery: DeliveryDetails, paymentMethod: PaymentMethod) => Promise<Order>;
+  placeOrder: (delivery: DeliveryDetails, paymentMethod: PaymentMethod, couponCode?: string) => Promise<Order>;
 };
+
+type Totals = { discount: number; deliveryFee: number; total: number };
 
 type Field = keyof DeliveryDetails;
 
@@ -75,13 +78,17 @@ export function CheckoutPage({ cart, cartTotal, user, savedDelivery, setQuantity
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
   const [placing, setPlacing] = useState(false);
   const [orderError, setOrderError] = useState('');
+  const [coupon, setCoupon] = useState<Coupon | null>(null);
   usePageTitle(placedOrder ? 'Order confirmed' : 'Checkout');
 
   if (placedOrder) return <OrderConfirmation order={placedOrder} />;
   // While an order is being placed the cart empties just before the confirmation arrives.
   if (cart.length === 0 && !placing) return <EmptyCheckout />;
 
-  const total = cartTotal + deliveryFeeFor(cartTotal);
+  // A coupon whose minimum order the cart no longer reaches takes nothing off and isn't sent.
+  const discount = coupon ? discountFor(coupon, cartTotal) : 0;
+  const deliveryFee = deliveryFeeFor(cartTotal);
+  const totals: Totals = { discount, deliveryFee, total: cartTotal - discount + deliveryFee };
 
   const update = (event: ChangeEvent<HTMLInputElement>): void => {
     const field = event.target.name as Field;
@@ -119,7 +126,7 @@ export function CheckoutPage({ cart, cartTotal, user, savedDelivery, setQuantity
     setPlacing(true);
     setOrderError('');
     try {
-      setPlacedOrder(await placeOrder(form, paymentMethod));
+      setPlacedOrder(await placeOrder(form, paymentMethod, discount > 0 ? coupon?.code : undefined));
     } catch (error) {
       setOrderError(error instanceof Error ? error.message : 'Something went wrong. Try again.');
     } finally {
@@ -204,7 +211,7 @@ export function CheckoutPage({ cart, cartTotal, user, savedDelivery, setQuantity
                 disabled={placing}
                 className="mt-7 w-full rounded-full bg-[#0b6fce] py-4 font-extrabold text-white transition hover:bg-[#082b62] disabled:cursor-wait disabled:opacity-60"
               >
-                {placing ? 'Placing your order…' : `Place order · ${formatPrice(total)}`}
+                {placing ? 'Placing your order…' : `Place order · ${formatPrice(totals.total)}`}
               </button>
               {orderError && (
                 <p role="alert" className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
@@ -217,7 +224,7 @@ export function CheckoutPage({ cart, cartTotal, user, savedDelivery, setQuantity
             </>
           )}
         </section>
-        <OrderSummary cart={cart} cartTotal={cartTotal} setQuantity={setQuantity} />
+        <OrderSummary cart={cart} cartTotal={cartTotal} totals={totals} coupon={coupon} setCoupon={setCoupon} setQuantity={setQuantity} />
       </div>
     </main>
   );
@@ -245,8 +252,16 @@ function CheckoutSteps({ step }: { step: number }) {
   );
 }
 
-function OrderSummary({ cart, cartTotal, setQuantity }: { cart: CartItem[]; cartTotal: number; setQuantity: (id: number, quantity: number) => void }) {
-  const deliveryFee = deliveryFeeFor(cartTotal);
+type OrderSummaryProps = {
+  cart: CartItem[];
+  cartTotal: number;
+  totals: Totals;
+  coupon: Coupon | null;
+  setCoupon: (coupon: Coupon | null) => void;
+  setQuantity: (id: number, quantity: number) => void;
+};
+
+function OrderSummary({ cart, cartTotal, totals: { discount, deliveryFee, total }, coupon, setCoupon, setQuantity }: OrderSummaryProps) {
   return (
     <aside className="h-fit rounded-[2rem] bg-[#082b62] p-5 text-white shadow-xl sm:p-8">
       <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-[#c9f23b]">Order summary</p>
@@ -268,11 +283,18 @@ function OrderSummary({ cart, cartTotal, setQuantity }: { cart: CartItem[]; cart
           </div>
         ))}
       </div>
+      <CouponBox subtotal={cartTotal} coupon={coupon} setCoupon={setCoupon} />
       <div className="mt-6 space-y-3 text-sm text-blue-100">
         <div className="flex justify-between">
           <span>Subtotal</span>
           <span>{formatPrice(cartTotal)}</span>
         </div>
+        {discount > 0 && (
+          <div className="flex justify-between font-bold text-[#c9f23b]">
+            <span>Coupon {coupon?.code}</span>
+            <span>−{formatPrice(discount)}</span>
+          </div>
+        )}
         <div className="flex justify-between">
           <span>Delivery</span>
           {deliveryFee === 0 ? <span className="font-bold text-[#c9f23b]">FREE</span> : <span>{formatPrice(deliveryFee)}</span>}
@@ -280,7 +302,7 @@ function OrderSummary({ cart, cartTotal, setQuantity }: { cart: CartItem[]; cart
         {deliveryFee > 0 && <p className="text-xs text-blue-200">Add {formatPrice(FREE_DELIVERY_THRESHOLD - cartTotal)} more for free delivery.</p>}
         <div className="mt-4 flex justify-between border-t border-white/15 pt-4 text-lg font-black text-white">
           <span>Total</span>
-          <span>{formatPrice(cartTotal + deliveryFee)}</span>
+          <span>{formatPrice(total)}</span>
         </div>
       </div>
     </aside>
@@ -301,9 +323,14 @@ function OrderConfirmation({ order }: { order: Order }) {
           Order #{order.id} for {formatPrice(order.total)} has been received{order.paymentMethod === 'cod' ? ' — please keep the cash ready at delivery' : ''}. We will send dispatch
           updates to {order.delivery.phone}.
         </p>
+        {order.discount > 0 && (
+          <p className="mx-auto mt-4 w-fit rounded-full bg-emerald-50 px-4 py-2 text-sm font-extrabold text-[#159a7a]">
+            You saved {formatPrice(order.discount)} with {order.couponCode}
+          </p>
+        )}
         <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-          <Link to="/orders" className="rounded-full bg-[#0b6fce] px-7 py-4 font-extrabold text-white transition hover:bg-[#082b62]">
-            View my orders
+          <Link to={`/orders/${order.id}`} className="rounded-full bg-[#0b6fce] px-7 py-4 font-extrabold text-white transition hover:bg-[#082b62]">
+            View order details
           </Link>
           <Link to="/#products" className="rounded-full border-2 border-slate-200 px-7 py-4 font-extrabold text-[#082b62] transition hover:border-[#0b6fce] hover:text-[#0b6fce]">
             Continue shopping

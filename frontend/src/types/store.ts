@@ -31,6 +31,17 @@ export type User = {
   preferences: { smsUpdates: boolean; offers: boolean };
 };
 
+// A discount code the signed-in customer can use (each works once per customer).
+export type Coupon = {
+  code: string;
+  kind: 'percent' | 'flat';
+  amount: number; // the percentage off, or the rupees off
+  maxDiscount: number | null; // the most a percent coupon takes off
+  minSubtotal: number;
+  firstOrderOnly: boolean;
+  expiresAt: string | null;
+};
+
 export type DeliveryDetails = { name: string; phone: string; address: string; city: string; pincode: string };
 export type PaymentMethod = 'online' | 'cod';
 export type OrderStatus = 'Processing' | 'Delivered' | 'Cancelled';
@@ -41,8 +52,10 @@ export type Order = {
   placedAt: string;
   items: OrderItem[];
   subtotal: number;
+  discount: number; // what couponCode took off the subtotal
+  couponCode: string | null;
   deliveryFee: number;
-  total: number;
+  total: number; // subtotal - discount + deliveryFee
   delivery: DeliveryDetails;
   paymentMethod: PaymentMethod;
   status: OrderStatus;

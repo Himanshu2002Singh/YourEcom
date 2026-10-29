@@ -61,14 +61,44 @@ CREATE TABLE IF NOT EXISTS orders (
   user_id        CHAR(36)                       NOT NULL,
   items          JSON                           NOT NULL,   -- [{ id, name, price, unit, image, quantity }]
   subtotal       INT                            NOT NULL,
+  discount       INT                            NOT NULL DEFAULT 0,   -- what coupon_code took off the subtotal
+  coupon_code    VARCHAR(30)                    NULL,
   delivery_fee   INT                            NOT NULL,
-  total          INT                            NOT NULL,
+  total          INT                            NOT NULL,   -- subtotal - discount + delivery_fee
   delivery       JSON                           NOT NULL,   -- { name, phone, address, city, pincode }
   payment_method ENUM('online', 'cod')          NOT NULL,
   status         ENUM('Processing', 'Delivered', 'Cancelled') NOT NULL DEFAULT 'Processing',
   placed_at      TIMESTAMP(6)                   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),   -- microseconds keep "newest first" exact
   INDEX orders_by_user (user_id, placed_at),
   CONSTRAINT orders_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
+-- Discount codes for the checkout. Each customer can use a code once; a cancelled order gives
+-- it back. To retire a code, set active to FALSE (orders keep their own copy of the code).
+CREATE TABLE IF NOT EXISTS coupons (
+  code             VARCHAR(30)              NOT NULL PRIMARY KEY,   -- upper-case letters and digits
+  kind             ENUM('percent', 'flat')  NOT NULL,
+  amount           INT                      NOT NULL,   -- the percentage off, or the rupees off
+  max_discount     INT                      NULL,       -- the most a percent coupon takes off
+  min_subtotal     INT                      NOT NULL DEFAULT 0,
+  first_order_only BOOLEAN                  NOT NULL DEFAULT FALSE,
+  expires_at       TIMESTAMP                NULL,       -- NULL never expires
+  active           BOOLEAN                  NOT NULL DEFAULT TRUE
+);
+
+-- The launch offers. Rows that already exist are left alone.
+INSERT IGNORE INTO coupons (code, kind, amount, max_discount, min_subtotal, first_order_only) VALUES
+  ('WELCOME10', 'percent', 10, 250,  0,    TRUE),
+  ('SAVE100',   'flat',    100, NULL, 1000, FALSE),
+  ('BULK15',    'percent', 15, 1500, 5000, FALSE);
+
+-- One-time links for customers who forgot their password. Only a hash of each link's token is
+-- kept, so these rows alone can't be used to reset anyone's password.
+CREATE TABLE IF NOT EXISTS password_resets (
+  token_hash CHAR(64)  NOT NULL PRIMARY KEY,   -- SHA-256 (hex) of the token in the emailed link
+  user_id    CHAR(36)  NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  CONSTRAINT password_resets_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
 -- Products each customer saved for later.

@@ -2,6 +2,7 @@
 import { Router } from 'express';
 import { health } from '../controllers/health.controller.js';
 import authRoutes from './auth.routes.js';
+import couponRoutes from './coupon.routes.js';
 import meRoutes from './me.routes.js';
 import orderRoutes from './order.routes.js';
 import productRoutes from './product.routes.js';
@@ -14,6 +15,7 @@ router.use('/auth', authRoutes);
 router.use('/me', meRoutes);
 router.use('/products', productRoutes);
 router.use('/orders', orderRoutes);
+router.use('/coupons', couponRoutes);
 router.use('/wishlist', wishlistRoutes);
 
 export default router;

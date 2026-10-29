@@ -87,7 +87,7 @@ export function Header({ cartCount, wishlistCount, openCart, search, setSearch, 
 
   return (
     <>
-      <div className="bg-[#082b62] px-4 py-2 text-center text-xs font-semibold tracking-wide text-white sm:text-sm">
+      <div className="bg-[#082b62] px-4 py-2 text-center text-xs font-semibold tracking-wide text-white sm:text-sm print:hidden">
         <span className="mr-2 inline-block rounded-full bg-[#c9f23b] px-2 py-0.5 text-[10px] font-extrabold uppercase text-[#082b62]">Bulk orders</span>
         Free delivery<span className="max-[399px]:hidden"> on orders</span> above {formatPrice(FREE_DELIVERY_THRESHOLD)}
         <span className="hidden md:inline">
@@ -95,7 +95,7 @@ export function Header({ cartCount, wishlistCount, openCart, search, setSearch, 
         </span>
       </div>
       {/* Not sticky on short screens (phones in landscape), where it would cover a large part of the page. */}
-      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur-md [@media(max-height:500px)]:static">
+      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur-md print:hidden [@media(max-height:500px)]:static">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-4 sm:gap-5 lg:px-8">
           <Logo onClick={closeMenu} />
           <nav className="hidden items-center gap-6 whitespace-nowrap text-sm font-bold text-slate-600 lg:flex">
@@ -298,12 +298,21 @@ const footerLinks: [string, [string, string][]][] = [
       ['My account', '/profile'],
     ],
   ],
+  [
+    'Policies',
+    [
+      ['Shipping and delivery', '/policies/shipping'],
+      ['Returns and refunds', '/policies/returns'],
+      ['Privacy policy', '/policies/privacy'],
+      ['Terms of use', '/policies/terms'],
+    ],
+  ],
 ];
 
 export function Footer() {
   return (
-    <footer className="bg-[#061e45] text-blue-200">
-      <div className="mx-auto grid max-w-7xl gap-10 px-5 py-12 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1.2fr] lg:px-8">
+    <footer className="bg-[#061e45] text-blue-200 print:hidden">
+      <div className="mx-auto grid max-w-7xl gap-10 px-5 py-12 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1.1fr_1.2fr] lg:px-8">
         <div>
           <p className="text-lg font-black text-white">YourEcom</p>
           <p className="mt-3 max-w-xs text-sm leading-6">Reliable medical disposables for hospitals, clinics and homes, delivered across India.</p>

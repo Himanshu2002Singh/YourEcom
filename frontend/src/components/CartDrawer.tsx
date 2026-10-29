@@ -139,6 +139,7 @@ export function CartDrawer({ open, cart, cartCount, cartTotal, setOpen, setQuant
             <button onClick={checkout} className="mt-5 w-full rounded-full bg-[#0b6fce] py-4 font-extrabold text-white transition hover:bg-[#082b62]">
               Continue to checkout
             </button>
+            <p className="mt-3 text-center text-xs font-semibold text-slate-400">Have a coupon? Apply it at checkout.</p>
           </div>
         )}
       </aside>

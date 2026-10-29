@@ -1,15 +1,17 @@
 // /api/orders — placing orders and reading back the signed-in customer's own orders.
+import * as Coupon from '../models/coupon.model.js';
 import * as Order from '../models/order.model.js';
 import { priceOrder } from '../services/pricing.service.js';
 import { HttpError } from '../utils/HttpError.js';
 import { cleanOrder, cleanStatus } from '../validators/order.validator.js';
 import { orderView } from '../views/order.view.js';
 
-// POST /api/orders { items: [{ id, quantity }], delivery, paymentMethod }. Prices, the
-// delivery fee and the totals are worked out here; any the browser sends are ignored.
+// POST /api/orders { items: [{ id, quantity }], delivery, paymentMethod, couponCode? }. Prices,
+// the discount, the delivery fee and the totals are worked out here; any the browser sends are ignored.
 export async function placeOrder(request, response) {
-  const { items, delivery, paymentMethod } = cleanOrder(request.body);
-  const order = await Order.create(request.user.id, { ...await priceOrder(items), delivery, paymentMethod });
+  const { items, delivery, paymentMethod, couponCode } = cleanOrder(request.body);
+  const coupon = couponCode && await Coupon.findUsable(request.user.id, couponCode);
+  const order = await Order.create(request.user.id, { ...await priceOrder(items, coupon), delivery, paymentMethod });
   response.status(201).json({ order: orderView(order, request.user) });
 }
 

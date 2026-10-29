@@ -2,10 +2,10 @@
 // and session cookies.
 import assert from 'node:assert/strict';
 import { before, test } from 'node:test';
-import { deliveryFeeFor } from '../services/pricing.service.js';
+import { deliveryFeeFor, discountFor } from '../services/pricing.service.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
 import { readSession, startSession } from '../utils/session.js';
-import { MAX_QUANTITY, cleanOrder, cleanStatus } from '../validators/order.validator.js';
+import { MAX_QUANTITY, cleanCouponCode, cleanOrder, cleanStatus } from '../validators/order.validator.js';
 
 before(() => {
   process.env.SESSION_SECRET = 'test-secret-that-is-long-enough-for-hmac-signing';
@@ -27,8 +27,26 @@ test('checkout input is trimmed, and quantities go up to 999', () => {
     items: [{ id: 1, quantity: 999 }],
     delivery: { name: 'Aarav Singh', phone: '98765 43210', address: '12 MG Road', city: 'New Delhi', pincode: '110059' },
     paymentMethod: 'cod',
+    couponCode: null,
   });
   assert.throws(() => cleanOrder(order({ quantity: 1.5 })), { status: 400 });
+});
+
+test('a coupon takes a percentage (rounded down, up to its cap) or a flat amount, never more than the subtotal', () => {
+  const welcome = { kind: 'percent', amount: 10, max_discount: 250 };
+  assert.equal(discountFor(welcome, 899), 89);
+  assert.equal(discountFor(welcome, 4000), 250);
+  assert.equal(discountFor({ kind: 'percent', amount: 15, max_discount: null }, 1000), 150);
+  assert.equal(discountFor({ kind: 'flat', amount: 100, max_discount: null }, 1500), 100);
+  assert.equal(discountFor({ kind: 'flat', amount: 100, max_discount: null }, 60), 60);
+});
+
+test('coupon codes are trimmed and upper-cased, and only letters and digits', () => {
+  assert.equal(cleanCouponCode(' welcome10 '), 'WELCOME10');
+  assert.equal(cleanOrder({ ...order(), couponCode: 'save100' }).couponCode, 'SAVE100');
+  for (const code of ['', 'SAVE 100', 'SAVE-100', 'A'.repeat(31), 42]) {
+    assert.throws(() => cleanCouponCode(code), { status: 400 }, String(code));
+  }
 });
 
 test('phone numbers and pincodes follow the checkout form', () => {

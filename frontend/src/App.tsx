@@ -11,7 +11,10 @@ import { CheckoutPage } from '@/pages/CheckoutPage';
 import { HomePage } from '@/pages/HomePage';
 import { LoginPage } from '@/pages/LoginPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
+import { OrderDetailsPage } from '@/pages/OrderDetailsPage';
 import { OrdersPage } from '@/pages/OrdersPage';
+import { ForgotPasswordPage, ResetPasswordPage } from '@/pages/PasswordResetPages';
+import { PolicyPage } from '@/pages/PolicyPage';
 import { ProductPage } from '@/pages/ProductPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { WishlistPage } from '@/pages/WishlistPage';
@@ -144,11 +147,11 @@ function App() {
   };
 
   // Sends the cart as ids and quantities only: the backend prices the order from its own catalogue.
-  const placeOrder = async (delivery: DeliveryDetails, paymentMethod: PaymentMethod): Promise<Order> => {
+  const placeOrder = async (delivery: DeliveryDetails, paymentMethod: PaymentMethod, couponCode?: string): Promise<Order> => {
     try {
       const { order } = await api<{ order: Order }>('/orders', {
         method: 'POST',
-        body: { items: cart.map(({ id, quantity }: CartItem) => ({ id, quantity })), delivery, paymentMethod },
+        body: { items: cart.map(({ id, quantity }: CartItem) => ({ id, quantity })), delivery, paymentMethod, couponCode },
       });
       setOrders((current: Order[] | null) => [order, ...(current ?? [])]);
       setCartLines([]);
@@ -207,6 +210,13 @@ function App() {
     });
     setUser(signedIn);
     notify(`Welcome, ${signedIn.name.split(' ')[0]}`);
+  };
+
+  // From an emailed link: rejects with the API's message (an expired link…) for the page to show.
+  const resetPassword = async (token: string, password: string): Promise<void> => {
+    const { user: signedIn } = await api<{ user: User }>('/auth/reset-password', { method: 'POST', body: { token, password } });
+    setUser(signedIn);
+    notify('Your new password is saved and you’re signed in');
   };
 
   const signOut = async (): Promise<void> => {
@@ -275,6 +285,8 @@ function App() {
           )}
         />
         <Route path="/login" element={<LoginPage user={user} signIn={signIn} />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage resetPassword={resetPassword} />} />
         <Route
           path="/profile"
           element={requireUser((currentUser: User) => (
@@ -297,10 +309,12 @@ function App() {
           )}
         />
         <Route path="/orders" element={requireUser(() => <OrdersPage orders={orders ?? []} buyAgain={buyAgain} cancelOrder={cancelOrder} />)} />
+        <Route path="/orders/:id" element={requireUser(() => <OrderDetailsPage orders={orders ?? []} buyAgain={buyAgain} cancelOrder={cancelOrder} />)} />
+        <Route path="/policies/:slug" element={<PolicyPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
       <Footer />
-      <div aria-live="polite">
+      <div aria-live="polite" className="print:hidden">
         {notice && (
           <div className="fixed bottom-5 left-1/2 z-50 flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-full bg-[#082b62] py-2 pl-4 pr-2 text-sm font-bold text-white shadow-2xl">
             {notice.error ? <CircleAlert size={17} className="shrink-0 text-rose-300" /> : <Check size={17} className="shrink-0 text-[#c9f23b]" />}

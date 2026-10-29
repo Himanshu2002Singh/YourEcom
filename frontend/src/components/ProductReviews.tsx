@@ -3,12 +3,11 @@ import { Link, useLocation } from 'react-router';
 import { Star } from 'lucide-react';
 import { LoadError, Loading, Stars } from '@/components/StoreShared';
 import { ApiError, api } from '@/lib/api';
+import { formatDate } from '@/lib/format';
 import type { Product, Review, User } from '@/types/store';
 
 type ReviewsAnswer = { reviews: Review[]; canReview: boolean };
 type ProductReviewsProps = { product: Product; user: User | null | undefined; onSaved: () => void };
-
-const formatDate = (iso: string): string => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 
 // Picks 1–5 stars for a review, then submits or updates it.
 function ReviewForm({ productId, mine, saved }: { productId: number; mine?: Review; saved: (answer: ReviewsAnswer) => void }) {

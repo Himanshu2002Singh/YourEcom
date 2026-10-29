@@ -52,6 +52,8 @@ describe('without a database', () => {
     assert.equal((await call('/orders')).status, 401);
     assert.equal((await call('/orders/YE00000000')).status, 401);
     assert.equal((await call('/orders/YE00000000/cancel', { method: 'POST', body: {} })).status, 401);
+    assert.equal((await call('/coupons')).status, 401);
+    assert.equal((await call('/coupons/WELCOME10')).status, 401);
     assert.equal((await call('/wishlist')).status, 401);
     assert.equal((await call('/wishlist/1', { method: 'PUT', body: {} })).status, 401);
     assert.equal((await call('/products/1/reviews', { method: 'PUT', body: { rating: 5 } })).status, 401);
@@ -62,6 +64,11 @@ describe('without a database', () => {
     for (const body of [{ ...valid, name: '  ' }, { ...valid, email: 'nope' }, { ...valid, password: '12345' }]) {
       assert.equal((await call('/auth/register', { method: 'POST', body })).status, 400, JSON.stringify(body));
     }
+  });
+
+  test('a forgotten-password request needs a valid email address', async () => {
+    assert.equal((await call('/auth/forgot-password', { method: 'POST', body: { email: 'nope' } })).status, 400);
+    assert.equal((await call('/auth/reset-password', { method: 'POST', body: { token: 'x', password: '123' } })).status, 400);
   });
 
   test('an unknown product category is rejected before touching the database', async () => {
@@ -182,6 +189,8 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
       email,
       items: [{ id: 4, name: 'IV Administration Set', price: 899, unit: 'Pack of 25', image, quantity: 1 }],
       subtotal: 899,
+      discount: 0,
+      couponCode: null,
       deliveryFee: 99,
       total: 998,
       delivery,
@@ -271,6 +280,72 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
     assert.equal(signedOut.canReview, false);
     assert.equal(signedOut.reviews.some(item => item.mine), false);
     assert.equal((await call('/products/999/reviews')).status, 404);
+  });
+
+  test('a coupon works once per customer, from its minimum order, and comes back when the order is cancelled', async () => {
+    const shopper = (await call('/auth/register', { method: 'POST', body: { name: 'Coupon Customer', email: `test-${stamp}-coupons@example.com`, password: 'coupon-password' } })).cookie;
+    const codes = async () => (await call('/coupons', { cookie: shopper })).body.coupons.map(coupon => coupon.code);
+    const order = (couponCode, items = [{ id: 4, quantity: 1 }]) => call('/orders', { method: 'POST', cookie: shopper, body: { items, delivery, paymentMethod: 'cod', couponCode } });
+    const totals = ({ subtotal, discount, couponCode, deliveryFee, total }) => ({ subtotal, discount, couponCode, deliveryFee, total });
+
+    assert.deepEqual(await codes(), ['WELCOME10', 'SAVE100', 'BULK15']);
+    assert.deepEqual((await call('/coupons/welcome10', { cookie: shopper })).body.coupon, {
+      code: 'WELCOME10', kind: 'percent', amount: 10, maxDiscount: 250, minSubtotal: 0, firstOrderOnly: true, expiresAt: null,
+    });
+    assert.equal((await call('/coupons/NOSUCHCODE', { cookie: shopper })).status, 404);
+
+    const welcome = await order('welcome10');
+    assert.equal(welcome.status, 201);
+    assert.deepEqual(totals(welcome.body.order), { subtotal: 899, discount: 89, couponCode: 'WELCOME10', deliveryFee: 99, total: 909 });
+    assert.deepEqual((await order('WELCOME10')).body, { error: 'You’ve already used WELCOME10. Each code works once per customer.' });
+    assert.deepEqual(await codes(), ['SAVE100', 'BULK15']);
+
+    assert.deepEqual((await order('SAVE100')).body, { error: 'SAVE100 is for orders of ₹1,000 or more.' });
+    const save = await order('SAVE100', [{ id: 4, quantity: 2 }]);
+    assert.deepEqual(totals(save.body.order), { subtotal: 1798, discount: 100, couponCode: 'SAVE100', deliveryFee: 99, total: 1797 });
+    assert.deepEqual(await codes(), ['BULK15']);
+    await call(`/orders/${save.body.order.id}/cancel`, { method: 'POST', cookie: shopper, body: {} });
+    assert.deepEqual(await codes(), ['SAVE100', 'BULK15'], 'cancelling gives the code back');
+
+    const bulk = await order('BULK15', [{ id: 2, quantity: 20 }]);
+    assert.deepEqual(totals(bulk.body.order), { subtotal: 10980, discount: 1500, couponCode: 'BULK15', deliveryFee: 0, total: 9480 }, '15% capped at ₹1,500; free delivery goes by the subtotal');
+  });
+
+  test('a switched-off or expired coupon can’t be used', async () => {
+    const [expired, retired] = [`TEST${stamp}A`, `TEST${stamp}B`];
+    await query("INSERT INTO coupons (code, kind, amount, expires_at, active) VALUES (?, 'flat', 50, NOW() - INTERVAL 1 DAY, TRUE), (?, 'flat', 50, NULL, FALSE)", [expired, retired]);
+    try {
+      assert.deepEqual((await call(`/coupons/${expired}`, { cookie })).body, { error: `${expired} has expired.` });
+      assert.equal((await call(`/coupons/${retired}`, { cookie })).status, 404);
+      assert.ok(!(await call('/coupons', { cookie })).body.coupons.some(coupon => [expired, retired].includes(coupon.code)));
+      assert.equal((await call('/orders', { method: 'POST', cookie, body: { items: [{ id: 1, quantity: 1 }], delivery, paymentMethod: 'cod', couponCode: expired } })).status, 400);
+    } finally {
+      await query('DELETE FROM coupons WHERE code IN (?, ?)', [expired, retired]);
+    }
+  });
+
+  test('a forgotten password is reset once from the emailed link, which signs out everywhere else', async () => {
+    const resetEmail = `test-${stamp}-reset@example.com`;
+    const old = (await call('/auth/register', { method: 'POST', body: { name: 'Reset Customer', email: resetEmail, password: 'forgotten-password' } })).cookie;
+    const forgot = email => call('/auth/forgot-password', { method: 'POST', body: { email } });
+    assert.deepEqual((await forgot(`nobody-${stamp}@example.com`)).body, { ok: true }, 'the same answer without an account');
+    assert.deepEqual((await forgot(resetEmail.toUpperCase())).body, { ok: true });
+    const [{ user_id: userId }] = await query('SELECT user_id FROM password_resets JOIN users ON users.id = password_resets.user_id WHERE users.email = ?', [resetEmail]);
+
+    // Only the email has the real token, so the test adds links of its own for this customer.
+    const link = async (token, minutes) => query('INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES (SHA2(?, 256), ?, NOW() + INTERVAL ? MINUTE)', [token, userId, minutes]);
+    const reset = (token, password) => call('/auth/reset-password', { method: 'POST', body: { token, password } });
+    await link(`expired-${stamp}`, -1);
+    assert.equal((await reset(`expired-${stamp}`, 'remembered-password')).status, 400, 'expired');
+    await link(`valid-${stamp}`, 5);
+    assert.equal((await reset(`valid-${stamp}`, '12345')).status, 400, 'too short');
+    const done = await reset(`valid-${stamp}`, 'remembered-password');
+    assert.equal(done.status, 200, 'a too-short password didn’t use the link up');
+    assert.match(done.cookie, /^ye_session=/);
+    assert.equal((await call('/me', { cookie: old })).body.user, null, 'older sessions are over');
+    assert.equal((await reset(`valid-${stamp}`, 'another-password')).status, 400, 'each link works once');
+    assert.deepEqual(await query('SELECT * FROM password_resets WHERE user_id = ?', [userId]), [], 'the emailed link stops working too');
+    assert.equal((await call('/auth/login', { method: 'POST', body: { email: resetEmail, password: 'remembered-password' } })).status, 200);
   });
 
   test('sign-in attempts are limited per email address', async () => {

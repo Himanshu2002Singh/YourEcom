@@ -11,6 +11,8 @@ export function orderView(row, user) {
     placedAt: new Date(row.placed_at).toISOString(),
     items: row.items.map(itemView),
     subtotal: row.subtotal,
+    discount: row.discount,
+    couponCode: row.coupon_code,
     deliveryFee: row.delivery_fee,
     total: row.total,
     delivery: deliveryView(row.delivery),

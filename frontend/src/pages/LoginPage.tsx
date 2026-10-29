@@ -150,6 +150,13 @@ export function LoginPage({ user, signIn }: LoginPageProps) {
                 </button>
               }
             />
+            {isLogin && (
+              <p className="-mt-1 text-right text-sm">
+                <Link to="/forgot-password" state={{ email: values.email.trim() }} className="font-bold text-[#0b6fce] hover:underline">
+                  Forgot password?
+                </Link>
+              </p>
+            )}
             {formError && (
               <p role="alert" className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
                 {formError}
@@ -163,7 +170,17 @@ export function LoginPage({ user, signIn }: LoginPageProps) {
               {pending ? 'Please wait…' : isLogin ? 'Sign in to YourEcom' : 'Create my account'}
             </button>
           </form>
-          <p className="mt-6 text-center text-sm font-semibold text-slate-400">By continuing, you agree to our terms and privacy policy.</p>
+          <p className="mt-6 text-center text-sm font-semibold text-slate-400">
+            By continuing, you agree to our{' '}
+            <Link to="/policies/terms" className="text-slate-500 underline underline-offset-2 hover:text-[#0b6fce]">
+              terms of use
+            </Link>{' '}
+            and{' '}
+            <Link to="/policies/privacy" className="text-slate-500 underline underline-offset-2 hover:text-[#0b6fce]">
+              privacy policy
+            </Link>
+            .
+          </p>
         </div>
       </div>
     </main>
