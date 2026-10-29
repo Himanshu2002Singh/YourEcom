@@ -1,10 +1,12 @@
-import { startTransition, useEffect, useRef, useState, type ReactElement } from 'react';
+import { startTransition, useRef, useState, type ReactElement } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { Check } from 'lucide-react';
 import { CartDrawer } from '@/components/CartDrawer';
 import { Footer, Header } from '@/components/StoreShared';
 import { products } from '@/data/products';
 import { usePersistentState } from '@/hooks/usePersistentState';
+import { useScrollRestoration } from '@/hooks/useScrollRestoration';
+import { addToLines, setLineQuantity } from '@/lib/cart';
 import { deliveryFeeFor } from '@/lib/pricing';
 import { CheckoutPage } from '@/pages/CheckoutPage';
 import { HomePage } from '@/pages/HomePage';
@@ -15,21 +17,19 @@ import { ProductPage } from '@/pages/ProductPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import type { CartItem, CartLine, DeliveryDetails, Order, PaymentMethod, Product, User } from '@/types/store';
 
-const addLine = (lines: CartLine[], id: number, quantity: number): CartLine[] =>
-  lines.some((line: CartLine) => line.id === id)
-    ? lines.map((line: CartLine) => (line.id === id ? { ...line, quantity: line.quantity + quantity } : line))
-    : [...lines, { id, quantity }];
+type Notice = { message: string; action?: { label: string; run: () => void } };
 
 function App() {
-  const { pathname, hash, key } = useLocation();
+  const { pathname } = useLocation();
   const navigate = useNavigate();
   const [cartLines, setCartLines] = usePersistentState<CartLine[]>('yourecom.cart', []);
   const [user, setUser] = usePersistentState<User | null>('yourecom.user', null);
   const [orders, setOrders] = usePersistentState<Order[]>('yourecom.orders', []);
   const [cartOpen, setCartOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState<Notice | null>(null);
   const noticeTimer = useRef<number>();
+  useScrollRestoration();
 
   // The cart stores ids only, so prices and images always come from the current catalogue.
   const cart = cartLines.flatMap((line: CartLine): CartItem[] => {
@@ -40,35 +40,31 @@ function App() {
   const cartTotal = cart.reduce((total: number, item: CartItem) => total + item.price * item.quantity, 0);
   const userOrders = user ? orders.filter((order: Order) => order.email === user.email) : [];
 
-  useEffect(() => {
-    if (hash) document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth' });
-    else window.scrollTo({ top: 0, behavior: 'instant' });
-  }, [hash, key]);
-
-  const notify = (message: string): void => {
+  const notify = (message: string, action?: Notice['action']): void => {
     window.clearTimeout(noticeTimer.current);
-    setNotice(message);
-    noticeTimer.current = window.setTimeout(() => setNotice(''), 2200);
+    setNotice({ message, action });
+    noticeTimer.current = window.setTimeout(() => setNotice(null), action ? 4000 : 2500);
   };
 
-  const addToCart = (product: Product, quantity = 1): void => {
-    setCartLines((current: CartLine[]) => addLine(current, product.id, quantity));
-    notify(`${product.name} added to cart`);
+  const openCart = (): void => {
+    setNotice(null);
+    setCartOpen(true);
   };
 
-  const updateQuantity = (id: number, change: number): void => {
-    setCartLines((current: CartLine[]) =>
-      current
-        .map((line: CartLine) => (line.id === id ? { ...line, quantity: line.quantity + change } : line))
-        .filter((line: CartLine) => line.quantity > 0),
-    );
+  const quantityOf = (id: number): number => cartLines.find((line: CartLine) => line.id === id)?.quantity ?? 0;
+
+  const addToCart = (product: Product): void => {
+    setCartLines((current: CartLine[]) => addToLines(current, product.id, 1));
+    notify(`${product.name} added to cart`, { label: 'View cart', run: openCart });
   };
 
-  const removeFromCart = (id: number): void => setCartLines((current: CartLine[]) => current.filter((line: CartLine) => line.id !== id));
+  const setQuantity = (id: number, quantity: number): void => setCartLines((current: CartLine[]) => setLineQuantity(current, id, quantity));
+
+  const cartActions = { quantityOf, addToCart, setQuantity };
 
   const buyAgain = (order: Order): void => {
-    setCartLines((current: CartLine[]) => order.items.reduce((lines: CartLine[], item: CartItem) => addLine(lines, item.id, item.quantity), current));
-    setCartOpen(true);
+    setCartLines((current: CartLine[]) => order.items.reduce((lines: CartLine[], item: CartItem) => addToLines(lines, item.id, item.quantity), current));
+    openCart();
   };
 
   const placeOrder = (email: string, delivery: DeliveryDetails, paymentMethod: PaymentMethod): Order => {
@@ -110,10 +106,10 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[#f8fbfd] text-[#102f55]">
-      <Header cartCount={cartCount} openCart={() => setCartOpen(true)} search={search} setSearch={setSearch} user={user} />
+      <Header cartCount={cartCount} openCart={openCart} search={search} setSearch={setSearch} user={user} />
       <Routes>
-        <Route path="/" element={<HomePage addToCart={addToCart} search={search} setSearch={setSearch} />} />
-        <Route path="/product/:id" element={<ProductPage addToCart={addToCart} />} />
+        <Route path="/" element={<HomePage {...cartActions} search={search} setSearch={setSearch} />} />
+        <Route path="/product/:id" element={<ProductPage {...cartActions} openCart={openCart} />} />
         <Route
           path="/checkout"
           element={requireUser((currentUser: User) => (
@@ -122,7 +118,7 @@ function App() {
               cartTotal={cartTotal}
               user={currentUser}
               savedDelivery={userOrders[0]?.delivery}
-              updateQuantity={updateQuantity}
+              setQuantity={setQuantity}
               placeOrder={(delivery: DeliveryDetails, paymentMethod: PaymentMethod) => placeOrder(currentUser.email, delivery, paymentMethod)}
             />
           ))}
@@ -140,8 +136,16 @@ function App() {
       <Footer />
       <div aria-live="polite">
         {notice && (
-          <div className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-[#082b62] px-5 py-3 text-sm font-bold text-white shadow-2xl">
-            <Check size={17} className="text-[#c9f23b]" /> {notice}
+          <div className="fixed bottom-5 left-1/2 z-50 flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-full bg-[#082b62] py-2 pl-4 pr-2 text-sm font-bold text-white shadow-2xl">
+            <Check size={17} className="shrink-0 text-[#c9f23b]" />
+            <span className="min-w-0 truncate">{notice.message}</span>
+            {notice.action ? (
+              <button onClick={notice.action.run} className="shrink-0 rounded-full bg-[#c9f23b] px-3 py-1.5 text-xs font-black text-[#082b62] transition hover:bg-white">
+                {notice.action.label}
+              </button>
+            ) : (
+              <span className="pr-2" />
+            )}
           </div>
         )}
       </div>
@@ -151,8 +155,7 @@ function App() {
         cartCount={cartCount}
         cartTotal={cartTotal}
         setOpen={setCartOpen}
-        updateQuantity={updateQuantity}
-        removeFromCart={removeFromCart}
+        setQuantity={setQuantity}
         checkout={() => {
           setCartOpen(false);
           navigate('/checkout');

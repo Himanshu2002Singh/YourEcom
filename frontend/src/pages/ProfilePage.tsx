@@ -1,6 +1,7 @@
 import type { ChangeEvent } from 'react';
 import { Link } from 'react-router';
 import { ArrowRight, MapPin, PackageOpen } from 'lucide-react';
+import { usePageTitle } from '@/hooks/usePageTitle';
 import { formatPrice } from '@/lib/pricing';
 import type { CartItem, Order, User } from '@/types/store';
 
@@ -12,6 +13,7 @@ const preferenceOptions: [keyof User['preferences'], string][] = [
 ];
 
 export function ProfilePage({ user, orders, signOut, updatePreferences }: ProfilePageProps) {
+  usePageTitle('My account');
   const initials = user.name
     .split(' ')
     .filter(Boolean)
@@ -33,7 +35,7 @@ export function ProfilePage({ user, orders, signOut, updatePreferences }: Profil
       <div className="mb-10 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
         <div>
           <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-[#159a7a]">Your account</p>
-          <h1 className="mt-2 text-4xl font-black text-[#082b62]">Hello, {user.name.split(' ')[0]}.</h1>
+          <h1 className="mt-2 break-words text-4xl font-black text-[#082b62]">Hello, {user.name.split(' ')[0]}.</h1>
           <p className="mt-2 text-slate-500">Manage your details and keep your care essentials close.</p>
         </div>
         <button
@@ -43,13 +45,13 @@ export function ProfilePage({ user, orders, signOut, updatePreferences }: Profil
           Sign out
         </button>
       </div>
-      <div className="grid gap-5 md:grid-cols-3">
-        <div className="rounded-3xl bg-[#082b62] p-6 text-white md:col-span-2">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <div className="min-w-0 rounded-3xl bg-[#082b62] p-6 text-white lg:col-span-2">
+          <div className="flex flex-col items-start gap-4 sm:flex-row sm:justify-between">
+            <div className="min-w-0 max-w-full">
               <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#c9f23b] text-2xl font-black text-[#082b62]">{initials}</div>
-              <h2 className="mt-5 text-2xl font-black">{user.name}</h2>
-              <p className="mt-1 truncate text-blue-200">{user.email}</p>
+              <h2 className="mt-5 break-words text-2xl font-black">{user.name}</h2>
+              <p className="mt-1 break-words text-blue-200">{user.email}</p>
             </div>
             <span className="shrink-0 rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-[#c9f23b]">Member since {user.memberSince}</span>
           </div>
@@ -73,7 +75,7 @@ export function ProfilePage({ user, orders, signOut, updatePreferences }: Profil
           </span>
         </Link>
       </div>
-      <div className="mt-5 grid gap-5 lg:grid-cols-2">
+      <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
         <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-black text-[#082b62]">Saved address</h2>
           {savedAddress ? (

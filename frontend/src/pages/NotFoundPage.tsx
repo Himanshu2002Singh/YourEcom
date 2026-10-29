@@ -1,6 +1,8 @@
 import { Link } from 'react-router';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export function NotFoundPage() {
+  usePageTitle('Page not found');
   return (
     <main className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center px-5 py-16 text-center">
       <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-[#159a7a]">Error 404</p>

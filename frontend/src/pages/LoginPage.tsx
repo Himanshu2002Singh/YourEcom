@@ -1,10 +1,13 @@
-import { useState, type ChangeEvent, type FormEvent, type InputHTMLAttributes } from 'react';
+import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { Link, Navigate, useLocation } from 'react-router';
-import { ArrowLeft, LockKeyhole, Mail, ShieldCheck, UserRound, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, UserRound } from 'lucide-react';
+import { TextField } from '@/components/TextField';
+import { usePageTitle } from '@/hooks/usePageTitle';
 import type { User } from '@/types/store';
 
 type LoginPageProps = { user: User | null; signIn: (name: string, email: string) => void };
-type IconInputProps = { label: string; icon: LucideIcon } & InputHTMLAttributes<HTMLInputElement>;
+type Mode = 'login' | 'signup';
+type Field = 'name' | 'email' | 'password';
 
 // "aarav.singh@example.com" -> "Aarav Singh"; used when signing in without a name field.
 const nameFromEmail = (email: string): string =>
@@ -15,39 +18,57 @@ const nameFromEmail = (email: string): string =>
     .map((part: string) => part[0].toUpperCase() + part.slice(1))
     .join(' ') || email;
 
-function IconInput({ label, icon: Icon, ...input }: IconInputProps) {
-  return (
-    <label className="block">
-      <span className="mb-2 block text-sm font-extrabold text-[#082b62]">{label}</span>
-      <span className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 focus-within:border-[#0b6fce] focus-within:bg-white">
-        <Icon size={17} className="shrink-0 text-slate-400" />
-        <input required {...input} className="w-full bg-transparent py-3.5 outline-none" />
-      </span>
-    </label>
-  );
-}
+const errorFor = (field: Field, value: string): string | undefined => {
+  if (field === 'name') return value.trim() ? undefined : 'Enter your full name';
+  if (field === 'email') return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()) ? undefined : 'Enter a valid email address';
+  return value.length >= 6 ? undefined : 'Password must be at least 6 characters';
+};
 
 export function LoginPage({ user, signIn }: LoginPageProps) {
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from;
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState<Mode>('login');
+  const [values, setValues] = useState<Record<Field, string>>({ name: '', email: '', password: '' });
+  const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
+  const [showPassword, setShowPassword] = useState(false);
   const isLogin = mode === 'login';
+  usePageTitle(isLogin ? 'Sign in' : 'Create account');
 
   // Signed in (already, or just now via submit): continue to the page that sent us here.
   if (user) return <Navigate to={from ?? '/profile'} replace />;
 
+  const update = (event: ChangeEvent<HTMLInputElement>): void => {
+    const field = event.target.name as Field;
+    const value = event.target.value;
+    setValues((current) => ({ ...current, [field]: value }));
+    if (errors[field]) setErrors((current) => ({ ...current, [field]: errorFor(field, value) }));
+  };
+
+  const switchMode = (next: Mode): void => {
+    setMode(next);
+    setErrors({});
+  };
+
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
-    const cleanEmail = email.trim().toLowerCase();
-    signIn(isLogin ? nameFromEmail(cleanEmail) : name.trim(), cleanEmail);
+    const fields: Field[] = isLogin ? ['email', 'password'] : ['name', 'email', 'password'];
+    const nextErrors: Partial<Record<Field, string>> = {};
+    fields.forEach((field: Field) => {
+      nextErrors[field] = errorFor(field, values[field]);
+    });
+    setErrors(nextErrors);
+    const firstInvalid = fields.find((field: Field) => nextErrors[field]);
+    if (firstInvalid) {
+      document.getElementById(firstInvalid)?.focus();
+      return;
+    }
+    const email = values.email.trim().toLowerCase();
+    signIn(isLogin ? nameFromEmail(email) : values.name.trim(), email);
   };
 
   return (
     <main className="min-h-[calc(100vh-120px)] bg-[#eaf7ff] px-5 py-12">
-      <div className="mx-auto grid max-w-5xl overflow-hidden rounded-[2rem] bg-white shadow-2xl shadow-blue-100 lg:grid-cols-2">
+      <div className="mx-auto grid max-w-5xl grid-cols-1 overflow-hidden rounded-[2rem] bg-white shadow-2xl shadow-blue-100 lg:grid-cols-2">
         <div className="relative hidden overflow-hidden bg-[#082b62] p-12 lg:block">
           <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#0b86d8]/40 blur-2xl" />
           <div className="absolute -bottom-20 -left-20 h-72 w-72 rounded-full bg-[#159a7a]/30 blur-2xl" />
@@ -72,11 +93,11 @@ export function LoginPage({ user, signIn }: LoginPageProps) {
             <ArrowLeft size={16} /> Back to store
           </Link>
           <div className="flex gap-7 border-b border-slate-100">
-            {(['login', 'signup'] as const).map((value) => (
+            {(['login', 'signup'] as const).map((value: Mode) => (
               <button
                 key={value}
                 type="button"
-                onClick={() => setMode(value)}
+                onClick={() => switchMode(value)}
                 aria-pressed={mode === value}
                 className={`pb-4 text-sm font-extrabold ${mode === value ? 'border-b-2 border-[#0b6fce] text-[#0b6fce]' : 'text-slate-400 hover:text-slate-600'}`}
               >
@@ -88,28 +109,41 @@ export function LoginPage({ user, signIn }: LoginPageProps) {
           <p className="mt-2 text-slate-500">
             {from ? 'Please sign in to continue.' : isLogin ? 'Sign in to view your orders and saved details.' : 'Create your account for a smoother care experience.'}
           </p>
-          <form onSubmit={submit} className="mt-7 space-y-4">
+          <form noValidate onSubmit={submit} className="mt-7 space-y-4">
             {!isLogin && (
-              <IconInput label="Full name" icon={UserRound} autoComplete="name" value={name} onChange={(event: ChangeEvent<HTMLInputElement>) => setName(event.target.value)} placeholder="Aarav Singh" />
+              <TextField name="name" label="Full name" icon={UserRound} autoComplete="name" placeholder="Aarav Singh" value={values.name} onChange={update} error={errors.name} />
             )}
-            <IconInput
+            <TextField
+              name="email"
               label="Email address"
               icon={Mail}
               type="email"
               autoComplete="email"
-              value={email}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => setEmail(event.target.value)}
               placeholder="you@example.com"
+              value={values.email}
+              onChange={update}
+              error={errors.email}
             />
-            <IconInput
+            <TextField
+              name="password"
               label="Password"
               icon={LockKeyhole}
-              type="password"
-              minLength={6}
+              type={showPassword ? 'text' : 'password'}
               autoComplete={isLogin ? 'current-password' : 'new-password'}
-              value={password}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => setPassword(event.target.value)}
-              placeholder="Minimum 6 characters"
+              placeholder="Min. 6 characters"
+              value={values.password}
+              onChange={update}
+              error={errors.password}
+              suffix={
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="-m-2 shrink-0 rounded-full p-2 text-slate-400 transition hover:text-[#0b6fce]"
+                >
+                  {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                </button>
+              }
             />
             <button type="submit" className="w-full rounded-full bg-[#0b6fce] py-4 font-extrabold text-white transition hover:bg-[#082b62]">
               {isLogin ? 'Sign in to YourEcom' : 'Create my account'}

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router';
 import {
   ArrowRight,
   Bandage,
@@ -9,7 +10,9 @@ import {
   HeartHandshake,
   Instagram,
   Layers,
+  Mail,
   PackageCheck,
+  Phone,
   ShieldCheck,
   ShieldPlus,
   Sparkles,
@@ -21,6 +24,7 @@ import {
 } from 'lucide-react';
 import { ProductCard } from '@/components/StoreShared';
 import { categories, products } from '@/data/products';
+import { usePageTitle } from '@/hooks/usePageTitle';
 import type { Category, Product } from '@/types/store';
 
 const ALL_PRODUCTS = 'All products' as const;
@@ -41,17 +45,25 @@ const reasons = [
   ['04', 'Quick dispatch', 'Orders packed carefully and sent out on time.'],
 ];
 
-type HomePageProps = { addToCart: (product: Product, quantity?: number) => void; search: string; setSearch: (search: string) => void };
+type HomePageProps = {
+  quantityOf: (id: number) => number;
+  addToCart: (product: Product) => void;
+  setQuantity: (id: number, quantity: number) => void;
+  search: string;
+  setSearch: (search: string) => void;
+};
 
-export function HomePage({ addToCart, search, setSearch }: HomePageProps) {
+export function HomePage({ quantityOf, addToCart, setQuantity, search, setSearch }: HomePageProps) {
   const [activeCategory, setActiveCategory] = useState<Category | typeof ALL_PRODUCTS>(ALL_PRODUCTS);
   const query = search.trim().toLowerCase();
+  const filtering = query !== '' || activeCategory !== ALL_PRODUCTS;
+  usePageTitle();
   const filteredProducts = useMemo(
     () =>
       products.filter(
         (product: Product) =>
           (activeCategory === ALL_PRODUCTS || product.category === activeCategory) &&
-          (product.name.toLowerCase().includes(query) || product.category.toLowerCase().includes(query)),
+          [product.name, product.category, product.description].some((text: string) => text.toLowerCase().includes(query)),
       ),
     [activeCategory, query],
   );
@@ -84,15 +96,15 @@ export function HomePage({ addToCart, search, setSearch }: HomePageProps) {
               Reliable medical disposables for hospitals, clinics and homes. Quality you can count on, delivered right to your door.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <a
-                href="#products"
+              <Link
+                to="/#products"
                 className="group inline-flex items-center justify-center gap-3 rounded-full bg-[#0b6fce] px-7 py-4 font-extrabold text-white shadow-xl shadow-blue-200 transition hover:-translate-y-1 hover:bg-[#085daf]"
               >
                 Explore products <ArrowRight size={18} className="transition group-hover:translate-x-1" />
-              </a>
-              <a href="#bulk" className="inline-flex items-center justify-center rounded-full border-2 border-[#0b6fce] px-7 py-4 font-extrabold text-[#0b6fce] transition hover:bg-white">
+              </Link>
+              <Link to="/#bulk" className="inline-flex items-center justify-center rounded-full border-2 border-[#0b6fce] px-7 py-4 font-extrabold text-[#0b6fce] transition hover:bg-white">
                 Request bulk quote
-              </a>
+              </Link>
             </div>
             <div className="mt-10 flex flex-wrap gap-x-8 gap-y-3 text-sm font-semibold text-slate-600">
               <span className="flex items-center gap-2">
@@ -199,10 +211,28 @@ export function HomePage({ addToCart, search, setSearch }: HomePageProps) {
               </button>
             ))}
           </div>
+          {filtering && (
+            <p className="-mt-3 mb-6 text-sm font-semibold text-slate-500">
+              Showing {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
+              {activeCategory !== ALL_PRODUCTS && (
+                <>
+                  {' '}in <strong className="text-[#082b62]">{activeCategory}</strong>
+                </>
+              )}
+              {query && (
+                <>
+                  {' '}for “<strong className="text-[#082b62]">{search.trim()}</strong>”
+                </>
+              )}
+              <button onClick={showAllProducts} className="-my-1 ml-3 py-1 font-extrabold text-[#0b6fce] hover:underline">
+                Clear filters
+              </button>
+            </p>
+          )}
           {filteredProducts.length > 0 ? (
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {filteredProducts.map((product: Product) => (
-                <ProductCard key={product.id} product={product} addToCart={addToCart} />
+                <ProductCard key={product.id} product={product} quantity={quantityOf(product.id)} addToCart={addToCart} setQuantity={setQuantity} />
               ))}
             </div>
           ) : (
@@ -220,7 +250,7 @@ export function HomePage({ addToCart, search, setSearch }: HomePageProps) {
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <div className="relative">
             <img
-              className="h-[420px] w-full rounded-[2rem] object-cover shadow-xl"
+              className="h-72 w-full rounded-[2rem] object-cover shadow-xl sm:h-[420px]"
               src="https://images.pexels.com/photos/5729400/pexels-photo-5729400.jpeg?auto=compress&cs=tinysrgb&w=1000"
               alt="Syringe resting on a surgical mask"
               loading="lazy"
@@ -259,17 +289,25 @@ export function HomePage({ addToCart, search, setSearch }: HomePageProps) {
       </section>
 
       <div className="mx-auto mb-16 max-w-7xl px-5 lg:px-8">
-        <section id="bulk" className="scroll-mt-24 overflow-hidden rounded-[2rem] bg-[#082b62]">
-          <div className="relative flex flex-col justify-between gap-8 px-7 py-10 sm:px-12 lg:flex-row lg:items-center lg:py-12">
+        <section id="bulk" className="scroll-mt-40 overflow-hidden rounded-[2rem] bg-[#082b62] md:scroll-mt-24">
+          <div className="relative flex flex-col justify-between gap-8 px-6 py-10 sm:px-12 lg:flex-row lg:items-center lg:py-12">
             <div className="absolute right-0 top-0 h-full w-1/2 bg-[radial-gradient(circle_at_center,_rgba(11,134,216,.35),_transparent_65%)]" />
             <div className="relative">
               <p className="mb-2 text-sm font-extrabold uppercase tracking-[0.18em] text-[#c9f23b]">Need more than a box?</p>
               <h2 className="max-w-xl text-3xl font-black text-white sm:text-4xl">Stock up smart with our bulk orders.</h2>
               <p className="mt-3 max-w-xl text-blue-100">Get custom pricing, dedicated support and reliable supply for your hospital, clinic or business.</p>
             </div>
-            <a href="#contact" className="relative inline-flex shrink-0 items-center justify-center gap-3 rounded-full bg-[#c9f23b] px-6 py-4 font-black text-[#082b62] transition hover:bg-white">
-              Talk to an expert <ArrowRight size={18} />
-            </a>
+            <div className="relative flex shrink-0 flex-col gap-3 sm:flex-row">
+              <a href="tel:+919643821551" className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full bg-[#c9f23b] px-5 py-4 text-sm font-black text-[#082b62] transition hover:bg-white sm:px-6 sm:text-base">
+                <Phone size={18} /> Call +91 96438 21551
+              </a>
+              <a
+                href="mailto:hello@yourecom.in?subject=Bulk%20order%20enquiry"
+                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full border-2 border-white/30 px-5 py-4 text-sm font-black text-white transition hover:border-white hover:bg-white/10 sm:px-6 sm:text-base"
+              >
+                <Mail size={18} /> Email for a quote
+              </a>
+            </div>
           </div>
         </section>
       </div>
