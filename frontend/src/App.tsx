@@ -5,7 +5,7 @@ import { CartDrawer } from '@/components/CartDrawer';
 import { Footer, Header, LoadError, Loading, WhatsAppButton } from '@/components/StoreShared';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useScrollRestoration } from '@/hooks/useScrollRestoration';
-import { ApiError, api } from '@/lib/api';
+import { ApiError, NO_API, api } from '@/lib/api';
 import { addToLines, setLineQuantity } from '@/lib/cart';
 import { CheckoutPage } from '@/pages/CheckoutPage';
 import { HomePage } from '@/pages/HomePage';
@@ -51,6 +51,10 @@ function App() {
 
   const loadProducts = useCallback((): void => {
     setCatalogueError('');
+    if (NO_API) {
+      import('@/data/previewCatalogue').then(({ previewCatalogue }) => setProducts(previewCatalogue));
+      return;
+    }
     api<{ products: Product[] }>('/products')
       .then(({ products: catalogue }) => setProducts(catalogue))
       .catch((error: ApiError) => setCatalogueError(error.message));

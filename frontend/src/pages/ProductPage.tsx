@@ -5,6 +5,7 @@ import { QuantityStepper } from '@/components/QuantityStepper';
 import { ProductCard, RatingSummary, SaveButton, StockNote, WhatsAppIcon, type ShopActions } from '@/components/StoreShared';
 import { whatsAppLink } from '@/data/contact';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { NO_API } from '@/lib/api';
 import { formatPrice } from '@/lib/pricing';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import type { Product, User } from '@/types/store';
@@ -98,7 +99,7 @@ export function ProductPage({ products, openCart, user, reloadProducts, ...shop 
           </div>
         </div>
       </div>
-      <ProductReviews product={product} user={user} onSaved={reloadProducts} />
+      {!NO_API && <ProductReviews product={product} user={user} onSaved={reloadProducts} />}
       <section className="mt-16">
         <h2 className="text-2xl font-semibold text-navy sm:text-3xl">{sameCategory.length > 0 ? `More in ${product.category}` : 'You may also need'}</h2>
         <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
