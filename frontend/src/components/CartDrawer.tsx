@@ -53,18 +53,18 @@ export function CartDrawer({ open, cart, cartCount, cartTotal, setOpen, setQuant
   const remainingForFreeDelivery = FREE_DELIVERY_THRESHOLD - cartTotal;
 
   return (
-    <div className="fixed inset-0 z-40 bg-[#082b62]/30 backdrop-blur-sm" onClick={() => setOpen(false)}>
+    <div className="fixed inset-0 z-40 bg-navy/30 backdrop-blur-sm" onClick={() => setOpen(false)}>
       <aside
         ref={panel}
         role="dialog"
         aria-modal="true"
         aria-labelledby="cart-title"
         onClick={(event: MouseEvent<HTMLElement>) => event.stopPropagation()}
-        className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col overflow-y-auto bg-white shadow-2xl"
+        className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col overflow-y-auto bg-white shadow-xl"
       >
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
           <div>
-            <h2 id="cart-title" className="text-xl font-black text-[#082b62]">
+            <h2 id="cart-title" className="text-xl font-semibold text-navy">
               Your cart
             </h2>
             <p className="mt-1 text-sm text-slate-400">
@@ -79,27 +79,27 @@ export function CartDrawer({ open, cart, cartCount, cartTotal, setOpen, setQuant
         <div className="flex-1 overflow-y-auto p-5 sm:p-6 [@media(max-height:500px)]:flex-none [@media(max-height:500px)]:overflow-visible">
           {cart.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
-              <div className="rounded-full bg-sky-50 p-5 text-[#0b6fce]">
+              <div className="rounded-full bg-brand-soft p-5 text-brand">
                 <ShoppingCart size={30} />
               </div>
-              <h3 className="mt-5 font-extrabold text-[#082b62]">Your cart is empty</h3>
+              <h3 className="mt-5 font-semibold text-navy">Your cart is empty</h3>
               <p className="mt-2 text-sm text-slate-400">Add supplies you need and they will appear here.</p>
-              <button onClick={() => setOpen(false)} className="mt-6 rounded-full bg-[#eaf7ff] px-5 py-2.5 text-sm font-extrabold text-[#0b6fce] transition hover:bg-[#0b6fce] hover:text-white">
+              <button onClick={() => setOpen(false)} className="mt-6 rounded-lg bg-brand-soft px-5 py-2.5 text-sm font-semibold text-brand transition hover:bg-brand hover:text-white">
                 Continue shopping
               </button>
             </div>
           ) : (
             <div className="space-y-4">
               {cart.map((item: CartItem) => (
-                <div key={item.id} className="flex gap-3 rounded-2xl border border-slate-100 p-3">
+                <div key={item.id} className="flex gap-3 rounded-xl border border-slate-100 p-3">
                   <img src={item.image} alt={item.name} className="h-16 w-16 shrink-0 rounded-xl object-cover sm:h-20 sm:w-20" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="font-extrabold leading-snug text-[#082b62]">{item.name}</p>
+                      <p className="font-semibold leading-snug text-navy">{item.name}</p>
                       <button
                         onClick={() => setQuantity(item.id, 0)}
                         aria-label={`Remove ${item.name} from cart`}
-                        className="-mr-1 -mt-1 shrink-0 rounded-full p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-[#e25d54]"
+                        className="-mr-1 -mt-1 shrink-0 rounded-full p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-500"
                       >
                         <Trash2 size={15} />
                       </button>
@@ -109,7 +109,7 @@ export function CartDrawer({ open, cart, cartCount, cartTotal, setOpen, setQuant
                     </p>
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                       <QuantityStepper quantity={item.quantity} onChange={(next: number) => setQuantity(item.id, next)} label={item.name} max={item.stock} size="sm" tone="light" />
-                      <span className="ml-auto font-black text-[#082b62]">{formatPrice(item.price * item.quantity)}</span>
+                      <span className="ml-auto font-bold text-navy">{formatPrice(item.price * item.quantity)}</span>
                     </div>
                   </div>
                 </div>
@@ -119,7 +119,7 @@ export function CartDrawer({ open, cart, cartCount, cartTotal, setOpen, setQuant
         </div>
         {cart.length > 0 && (
           <div className="border-t border-slate-100 p-6">
-            <p className="mb-4 rounded-2xl bg-sky-50 px-4 py-3 text-center text-sm font-bold text-[#0b6fce]">
+            <p className="mb-4 rounded-xl bg-brand-soft px-4 py-3 text-center text-sm font-bold text-brand">
               {remainingForFreeDelivery > 0 ? `Add ${formatPrice(remainingForFreeDelivery)} more for free delivery` : 'You have unlocked free delivery'}
             </p>
             <div className="space-y-2 text-sm text-slate-500">
@@ -129,14 +129,14 @@ export function CartDrawer({ open, cart, cartCount, cartTotal, setOpen, setQuant
               </div>
               <div className="flex justify-between">
                 <span>Delivery</span>
-                {deliveryFee === 0 ? <span className="font-bold text-[#159a7a]">FREE</span> : <span>{formatPrice(deliveryFee)}</span>}
+                {deliveryFee === 0 ? <span className="font-bold text-leaf">FREE</span> : <span>{formatPrice(deliveryFee)}</span>}
               </div>
-              <div className="flex justify-between border-t border-slate-100 pt-3 text-base font-black text-[#082b62]">
+              <div className="flex justify-between border-t border-slate-100 pt-3 text-base font-bold text-navy">
                 <span>Total</span>
                 <span>{formatPrice(cartTotal + deliveryFee)}</span>
               </div>
             </div>
-            <button onClick={checkout} className="mt-5 w-full rounded-full bg-[#0b6fce] py-4 font-extrabold text-white transition hover:bg-[#082b62]">
+            <button onClick={checkout} className="mt-5 w-full rounded-lg bg-brand py-4 font-semibold text-white transition hover:bg-navy">
               Continue to checkout
             </button>
             <p className="mt-3 text-center text-xs font-semibold text-slate-400">Have a coupon? Apply it at checkout.</p>

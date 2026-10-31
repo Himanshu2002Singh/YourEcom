@@ -17,11 +17,11 @@ export function TextField({ name, label, error, hint, icon: Icon, suffix, wide, 
   const message = error ?? hint;
   return (
     <div className={wide ? 'sm:col-span-2' : undefined}>
-      <label htmlFor={name} className="mb-2 block text-sm font-extrabold text-[#082b62]">
+      <label htmlFor={name} className="mb-2 block text-sm font-semibold text-navy">
         {label}
       </label>
       <div
-        className={`flex items-center gap-2 rounded-2xl border bg-slate-50 px-4 transition focus-within:bg-white ${error ? 'border-rose-400 focus-within:border-rose-500' : 'border-slate-200 focus-within:border-[#0b6fce]'}`}
+        className={`flex items-center gap-2 rounded-xl border bg-slate-50 px-4 transition focus-within:bg-white ${error ? 'border-rose-400 focus-within:border-rose-500' : 'border-slate-200 focus-within:border-brand'}`}
       >
         {Icon && <Icon size={17} className="shrink-0 text-slate-400" />}
         <input

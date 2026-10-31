@@ -2,7 +2,7 @@ import { startTransition, useCallback, useEffect, useRef, useState, type ReactEl
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { Check, CircleAlert } from 'lucide-react';
 import { CartDrawer } from '@/components/CartDrawer';
-import { Footer, Header, LoadError, Loading } from '@/components/StoreShared';
+import { Footer, Header, LoadError, Loading, WhatsAppButton } from '@/components/StoreShared';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useScrollRestoration } from '@/hooks/useScrollRestoration';
 import { ApiError, api } from '@/lib/api';
@@ -256,7 +256,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fbfd] text-[#102f55]">
+    <div className="min-h-screen bg-slate-50 text-slate-800">
       <Header cartCount={cartCount} wishlistCount={wishlist?.length ?? 0} openCart={openCart} search={search} setSearch={setSearch} user={user ?? null} />
       <Routes>
         <Route
@@ -314,13 +314,15 @@ function App() {
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
       <Footer />
+      <WhatsAppButton />
+      {/* Above the WhatsApp button on phones, where a long message would reach it. */}
       <div aria-live="polite" className="print:hidden">
         {notice && (
-          <div className="fixed bottom-5 left-1/2 z-50 flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-full bg-[#082b62] py-2 pl-4 pr-2 text-sm font-bold text-white shadow-2xl">
-            {notice.error ? <CircleAlert size={17} className="shrink-0 text-rose-300" /> : <Check size={17} className="shrink-0 text-[#c9f23b]" />}
+          <div className="fixed bottom-24 left-1/2 z-50 flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg bg-navy py-2 pl-4 pr-2 text-sm font-semibold text-white shadow-xl sm:bottom-5">
+            {notice.error ? <CircleAlert size={17} className="shrink-0 text-rose-300" /> : <Check size={17} className="shrink-0 text-emerald-300" />}
             <span className="min-w-0 truncate">{notice.message}</span>
             {notice.action ? (
-              <button onClick={notice.action.run} className="shrink-0 rounded-full bg-[#c9f23b] px-3 py-1.5 text-xs font-black text-[#082b62] transition hover:bg-white">
+              <button onClick={notice.action.run} className="shrink-0 rounded-md bg-white px-3 py-1.5 text-xs font-bold text-navy transition hover:bg-brand-soft">
                 {notice.action.label}
               </button>
             ) : (

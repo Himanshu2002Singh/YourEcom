@@ -9,9 +9,9 @@ import { ApiError, api } from '@/lib/api';
 
 function Card({ children }: { children: ReactNode }) {
   return (
-    <main className="min-h-[calc(100vh-120px)] bg-[#eaf7ff] px-5 py-12">
-      <div className="mx-auto max-w-md rounded-[2rem] bg-white p-7 shadow-2xl shadow-blue-100 sm:p-10">
-        <Link to="/login" className="mb-8 inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-[#0b6fce]">
+    <main className="min-h-[calc(100vh-120px)] bg-brand-soft px-5 py-12">
+      <div className="mx-auto max-w-md rounded-xl bg-white p-7 shadow-xl sm:p-10">
+        <Link to="/login" className="mb-8 inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-brand">
           <ArrowLeft size={16} /> Back to sign in
         </Link>
         {children}
@@ -22,7 +22,7 @@ function Card({ children }: { children: ReactNode }) {
 
 const FormError = ({ message }: { message: string }) =>
   message ? (
-    <p role="alert" className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+    <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
       {message}
     </p>
   ) : null;
@@ -59,17 +59,17 @@ export function ForgotPasswordPage() {
   if (sentTo) {
     return (
       <Card>
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-[#159a7a]">
+        <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-emerald-50 text-leaf">
           <MailCheck size={28} />
         </div>
-        <h1 className="mt-6 text-3xl font-black text-[#082b62]">Check your email</h1>
+        <h1 className="mt-6 text-3xl font-semibold text-navy">Check your email</h1>
         <p className="mt-3 leading-7 text-slate-500">
-          If there’s a YourEcom account for <strong className="break-all text-[#082b62]">{sentTo}</strong>, we’ve sent it a link to choose a new password. The link works for 30
+          If there’s a YourEcom account for <strong className="break-all text-navy">{sentTo}</strong>, we’ve sent it a link to choose a new password. The link works for 30
           minutes.
         </p>
         <p className="mt-6 text-sm text-slate-500">
           Nothing arrived? Check your spam folder, or{' '}
-          <button onClick={() => setSentTo('')} className="font-bold text-[#0b6fce] hover:underline">
+          <button onClick={() => setSentTo('')} className="font-bold text-brand hover:underline">
             send another link
           </button>
           .
@@ -80,7 +80,7 @@ export function ForgotPasswordPage() {
 
   return (
     <Card>
-      <h1 className="text-3xl font-black text-[#082b62]">Forgot your password?</h1>
+      <h1 className="text-3xl font-semibold text-navy">Forgot your password?</h1>
       <p className="mt-2 text-slate-500">Enter the email you signed up with and we’ll send you a link to choose a new one.</p>
       <form noValidate onSubmit={submit} className="mt-7 space-y-4">
         <TextField
@@ -101,7 +101,7 @@ export function ForgotPasswordPage() {
         <button
           type="submit"
           disabled={pending}
-          className="w-full rounded-full bg-[#0b6fce] py-4 font-extrabold text-white transition hover:bg-[#082b62] disabled:cursor-wait disabled:opacity-60"
+          className="w-full rounded-lg bg-brand py-4 font-semibold text-white transition hover:bg-navy disabled:cursor-wait disabled:opacity-60"
         >
           {pending ? 'Sending…' : 'Email me a reset link'}
         </button>
@@ -143,9 +143,9 @@ export function ResetPasswordPage({ resetPassword }: { resetPassword: (token: st
   if (!token) {
     return (
       <Card>
-        <h1 className="text-3xl font-black text-[#082b62]">This link is incomplete</h1>
+        <h1 className="text-3xl font-semibold text-navy">This link is incomplete</h1>
         <p className="mt-3 leading-7 text-slate-500">Open the link from your email again, or ask for a new one.</p>
-        <Link to="/forgot-password" className="mt-7 inline-flex rounded-full bg-[#0b6fce] px-6 py-3.5 font-extrabold text-white transition hover:bg-[#082b62]">
+        <Link to="/forgot-password" className="mt-7 inline-flex rounded-lg bg-brand px-6 py-3.5 font-semibold text-white transition hover:bg-navy">
           Send a new link
         </Link>
       </Card>
@@ -154,10 +154,10 @@ export function ResetPasswordPage({ resetPassword }: { resetPassword: (token: st
 
   return (
     <Card>
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-50 text-[#0b6fce]">
+      <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-brand-soft text-brand">
         <KeyRound size={26} />
       </div>
-      <h1 className="mt-6 text-3xl font-black text-[#082b62]">Choose a new password</h1>
+      <h1 className="mt-6 text-3xl font-semibold text-navy">Choose a new password</h1>
       <p className="mt-2 text-slate-500">You’ll be signed in, and signed out on every other device.</p>
       <form noValidate onSubmit={submit} className="mt-7 space-y-4">
         <TextField
@@ -178,7 +178,7 @@ export function ResetPasswordPage({ resetPassword }: { resetPassword: (token: st
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
-              className="-m-2 shrink-0 rounded-full p-2 text-slate-400 transition hover:text-[#0b6fce]"
+              className="-m-2 shrink-0 rounded-full p-2 text-slate-400 transition hover:text-brand"
             >
               {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
             </button>
@@ -186,14 +186,14 @@ export function ResetPasswordPage({ resetPassword }: { resetPassword: (token: st
         />
         <FormError message={formError} />
         {formError.includes('Ask for a new one') && (
-          <Link to="/forgot-password" className="block text-sm font-bold text-[#0b6fce] hover:underline">
+          <Link to="/forgot-password" className="block text-sm font-bold text-brand hover:underline">
             Send me a new link
           </Link>
         )}
         <button
           type="submit"
           disabled={pending}
-          className="w-full rounded-full bg-[#0b6fce] py-4 font-extrabold text-white transition hover:bg-[#082b62] disabled:cursor-wait disabled:opacity-60"
+          className="w-full rounded-lg bg-brand py-4 font-semibold text-white transition hover:bg-navy disabled:cursor-wait disabled:opacity-60"
         >
           {pending ? 'Saving…' : 'Save new password'}
         </button>

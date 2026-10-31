@@ -5,13 +5,13 @@ import type { Order, OrderItem, OrderStatus } from '@/types/store';
 // Pieces shared by the orders list and the order details page.
 
 const statusStyles: Record<OrderStatus, string> = {
-  Processing: 'bg-sky-50 text-[#0b6fce]',
-  Delivered: 'bg-emerald-50 text-[#159a7a]',
+  Processing: 'bg-brand-soft text-brand',
+  Delivered: 'bg-emerald-50 text-leaf',
   Cancelled: 'bg-slate-100 text-slate-500',
 };
 
 export function StatusPill({ status }: { status: OrderStatus }) {
-  return <span className={`rounded-full px-3 py-1 text-xs font-extrabold ${statusStyles[status]}`}>{status}</span>;
+  return <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[status]}`}>{status}</span>;
 }
 
 // The products as they were when the order was placed.
@@ -20,16 +20,16 @@ export function OrderItemList({ items }: { items: OrderItem[] }) {
     <ul className="divide-y divide-slate-100">
       {items.map((item: OrderItem) => (
         <li key={item.id} className="flex items-center gap-4 py-4 print:break-inside-avoid">
-          <img src={item.image} alt={item.name} className="h-16 w-16 shrink-0 rounded-2xl object-cover" />
+          <img src={item.image} alt={item.name} className="h-16 w-16 shrink-0 rounded-xl object-cover" />
           {/* Line total sits under the details on phones and on the right from sm up. */}
           <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <div className="min-w-0">
-              <h3 className="font-extrabold leading-snug text-[#082b62]">{item.name}</h3>
+              <h3 className="font-semibold leading-snug text-navy">{item.name}</h3>
               <p className="mt-1 text-sm font-semibold text-slate-400">
                 {item.quantity} × {formatPrice(item.price)} · {item.unit}
               </p>
             </div>
-            <p className="shrink-0 font-black text-[#082b62]">{formatPrice(item.price * item.quantity)}</p>
+            <p className="shrink-0 font-bold text-navy">{formatPrice(item.price * item.quantity)}</p>
           </div>
         </li>
       ))}
@@ -59,14 +59,14 @@ export function OrderActions({ order, buyAgain, cancelOrder, className = '' }: O
             <button
               onClick={() => void confirmCancel()}
               disabled={cancelling}
-              className="rounded-full bg-rose-600 px-4 py-2 text-sm font-extrabold text-white transition hover:bg-rose-700 disabled:opacity-60"
+              className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:opacity-60"
             >
               {cancelling ? 'Cancelling…' : 'Yes, cancel order'}
             </button>
             <button
               onClick={() => setConfirming(false)}
               disabled={cancelling}
-              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-extrabold text-slate-500 transition hover:text-[#082b62]"
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-500 transition hover:text-navy"
             >
               Keep it
             </button>
@@ -74,12 +74,12 @@ export function OrderActions({ order, buyAgain, cancelOrder, className = '' }: O
         ) : (
           <button
             onClick={() => setConfirming(true)}
-            className="rounded-full border border-slate-200 px-4 py-2 text-sm font-extrabold text-slate-500 transition hover:border-rose-200 hover:text-rose-600"
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-500 transition hover:border-rose-200 hover:text-rose-600"
           >
             Cancel order
           </button>
         ))}
-      <button onClick={() => buyAgain(order)} className="rounded-full border border-slate-200 px-4 py-2 text-sm font-extrabold text-[#0b6fce] transition hover:bg-sky-50">
+      <button onClick={() => buyAgain(order)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-brand transition hover:bg-brand-soft">
         Buy again
       </button>
     </div>

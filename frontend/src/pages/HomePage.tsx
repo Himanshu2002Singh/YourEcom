@@ -1,42 +1,19 @@
 import { useMemo, useState, type ChangeEvent } from 'react';
 import { Link } from 'react-router';
-import {
-  ArrowRight,
-  Bandage,
-  Clock3,
-  Droplets,
-  Facebook,
-  Hand,
-  HeartHandshake,
-  Instagram,
-  Layers,
-  Mail,
-  PackageCheck,
-  Phone,
-  ShieldCheck,
-  ShieldPlus,
-  Sparkles,
-  Syringe,
-  Truck,
-  Users,
-  Youtube,
-  type LucideIcon,
-} from 'lucide-react';
-import { LoadError, Loading, ProductCard, type ShopActions } from '@/components/StoreShared';
+import { ArrowRight, BadgeCheck, Building2, Check, Headset, Hospital, Landmark, MapPin, Phone, ShieldCheck, Stethoscope, Truck, type LucideIcon } from 'lucide-react';
+import { AddToCart, LoadError, Loading, ProductCard, StockNote, WhatsAppIcon, type ShopActions } from '@/components/StoreShared';
 import { categories } from '@/data/categories';
+import { ADDRESS, MAP_LINK, PHONE, PHONE_LINK, whatsAppLink } from '@/data/contact';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { formatPrice } from '@/lib/pricing';
 import type { Category, Product } from '@/types/store';
 
 const ALL_PRODUCTS = 'All products' as const;
 
-const categoryStyles: Record<Category, { icon: LucideIcon; tone: string }> = {
-  'Face Masks': { icon: ShieldPlus, tone: 'bg-sky-50 text-sky-700' },
-  Gloves: { icon: Hand, tone: 'bg-emerald-50 text-emerald-700' },
-  Syringes: { icon: Syringe, tone: 'bg-amber-50 text-amber-700' },
-  'IV Sets': { icon: Droplets, tone: 'bg-blue-50 text-blue-700' },
-  Bandages: { icon: Bandage, tone: 'bg-rose-50 text-rose-700' },
-  'Gauze & Cotton': { icon: Layers, tone: 'bg-teal-50 text-teal-700' },
-};
+// The client's main line, shown as a price list right after the hero.
+const SYRINGE_RANGE: Category[] = ['Syringes', 'Needles'];
+
+const BULK_MESSAGE = 'Hello YourEcom, please share your bulk rate for syringes. Sizes and quantities I need: ';
 
 type Sort = 'featured' | 'price-low' | 'price-high' | 'name';
 
@@ -47,19 +24,29 @@ const sortOptions: [Sort, string][] = [
   ['name', 'Name: A to Z'],
 ];
 
-// 'featured' keeps the catalogue's own order (sort is stable).
+// 'featured' lists the categories in the store's order (syringes first), each in catalogue order (sort is stable).
 const compareBy: Record<Sort, (a: Product, b: Product) => number> = {
-  featured: () => 0,
+  featured: (a: Product, b: Product) => categories.indexOf(a.category) - categories.indexOf(b.category),
   'price-low': (a: Product, b: Product) => a.price - b.price,
   'price-high': (a: Product, b: Product) => b.price - a.price,
   name: (a: Product, b: Product) => a.name.localeCompare(b.name),
 };
 
-const reasons = [
-  ['01', 'Quality checked', 'Every product is sourced from trusted manufacturers.'],
-  ['02', 'Made for bulk', 'Flexible pricing for hospitals and growing practices.'],
-  ['03', 'Human support', 'Real people ready to help with your requirements.'],
-  ['04', 'Quick dispatch', 'Orders packed carefully and sent out on time.'],
+// Who the client supplies and what they promise, from their posters.
+const buyers: [LucideIcon, string][] = [
+  [Landmark, 'Government hospitals'],
+  [Hospital, 'Local hospitals'],
+  [Stethoscope, 'Clinics and health centres'],
+  [Building2, 'Institutions and organisations'],
+];
+
+const supplies = ['Syringes', 'Needles', 'IV sets', 'Face masks', 'Gloves', 'Bandages', 'Gauze and cotton', 'Surgical items'];
+
+const promises: [LucideIcon, string, string][] = [
+  [BadgeCheck, 'High quality products', 'Sterile, sealed and single-use, as medical disposables should be.'],
+  [ShieldCheck, 'Hygienic and safe', 'Stored and packed with care, so every box reaches you clean.'],
+  [Truck, 'Timely delivery', 'Orders go out on time, from a single box to a full consignment.'],
+  [Headset, 'Customer support', 'Call or WhatsApp us about sizes, stock and bulk rates.'],
 ];
 
 type HomePageProps = ShopActions & {
@@ -87,157 +74,123 @@ export function HomePage({ products, catalogueError, reloadProducts, search, set
         .sort(compareBy[sort]),
     [products, activeCategory, query, sort],
   );
-
-  const showCategory = (category: Category): void => {
-    setActiveCategory(category);
-    document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const syringeRange = useMemo(() => (products ?? []).filter((product: Product) => SYRINGE_RANGE.includes(product.category)).sort(compareBy.featured), [products]);
 
   const showAllProducts = (): void => {
     setActiveCategory(ALL_PRODUCTS);
     setSearch('');
   };
 
+  const catalogueStatus = catalogueError ? <LoadError message={catalogueError} retry={reloadProducts} /> : <Loading label="Loading products…" />;
+
   return (
     <main>
-      <section className="relative isolate overflow-hidden bg-[#eaf7ff]">
-        <div className="absolute -right-24 -top-28 -z-10 h-96 w-96 rounded-full bg-[#c9f23b]/50 blur-3xl" />
-        <div className="mx-auto grid max-w-7xl items-center gap-10 px-5 pb-16 pt-12 lg:grid-cols-[1.02fr_.98fr] lg:px-8 lg:pb-20 lg:pt-20">
+      <section className="border-b border-slate-200 bg-white">
+        <div className="mx-auto grid max-w-7xl items-center gap-10 px-5 py-12 lg:grid-cols-2 lg:gap-14 lg:px-8 lg:py-16">
           <div>
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#b7e7e0] bg-white/80 px-4 py-2 text-xs font-extrabold uppercase tracking-[0.15em] text-[#108b77]">
-              <Sparkles size={15} /> Healthcare, delivered better
-            </div>
-            <h1 className="max-w-2xl text-5xl font-black leading-[1.03] tracking-[-0.06em] text-[#082b62] sm:text-6xl lg:text-[5.2rem]">
-              Everyday care.
-              <br />
-              <span className="text-[#0b86d8]">Made simple.</span>
-            </h1>
-            <p className="mt-6 max-w-xl text-lg leading-8 text-slate-600">
-              Reliable medical disposables for hospitals, clinics and homes. Quality you can count on, delivered right to your door.
+            <p className="text-sm font-semibold text-leaf">Medical disposables wholesaler · New Delhi</p>
+            <h1 className="mt-4 text-4xl font-semibold leading-tight tracking-tight text-navy sm:text-5xl">Disposable syringes for hospitals, clinics and government supply</h1>
+            <p className="mt-5 max-w-xl text-lg leading-8 text-slate-600">
+              Sterile, single-use syringes from 0.5 ml to 50 ml, insulin syringes and needles, along with masks, gloves and dressings. Buy by the box here, or ask us for a
+              bulk rate.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link
-                to="/#products"
-                className="group inline-flex items-center justify-center gap-3 rounded-full bg-[#0b6fce] px-7 py-4 font-extrabold text-white shadow-xl shadow-blue-200 transition hover:-translate-y-1 hover:bg-[#085daf]"
-              >
-                Explore products <ArrowRight size={18} className="transition group-hover:translate-x-1" />
+              <Link to="/#syringes" className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-6 py-3.5 font-semibold text-white transition hover:bg-brand-dark">
+                See syringe range <ArrowRight size={18} />
               </Link>
-              <Link to="/#bulk" className="inline-flex items-center justify-center rounded-full border-2 border-[#0b6fce] px-7 py-4 font-extrabold text-[#0b6fce] transition hover:bg-white">
-                Request bulk quote
-              </Link>
-            </div>
-            <div className="mt-10 flex flex-wrap gap-x-8 gap-y-3 text-sm font-semibold text-slate-600">
-              <span className="flex items-center gap-2">
-                <ShieldCheck size={18} className="text-[#159a7a]" /> Certified quality
-              </span>
-              <span className="flex items-center gap-2">
-                <Truck size={18} className="text-[#159a7a]" /> Pan-India delivery
-              </span>
-            </div>
-          </div>
-          <div className="relative mx-auto w-full max-w-xl">
-            <div className="absolute -left-4 top-1/2 h-24 w-24 -translate-y-1/2 rounded-full border-[14px] border-[#c9f23b] opacity-80" />
-            <div className="relative overflow-hidden rounded-[2rem] rounded-bl-[6rem] border-8 border-white bg-white shadow-2xl shadow-blue-200/70">
-              <img
-                className="h-[430px] w-full object-cover lg:h-[510px]"
-                src="https://images.pexels.com/photos/11069119/pexels-photo-11069119.jpeg?auto=compress&cs=tinysrgb&w=1200"
-                alt="Face masks and disposable gloves"
-              />
-              <div className="absolute bottom-5 left-5 right-5 rounded-2xl bg-white/95 p-4 shadow-lg backdrop-blur">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-[#159a7a]">Your trusted partner</p>
-                    <p className="mt-1 font-extrabold text-[#082b62]">Safe. Hygienic. Reliable.</p>
-                  </div>
-                  <div className="flex -space-x-2">
-                    <span className="h-9 w-9 rounded-full border-2 border-white bg-[#0b6fce]" />
-                    <span className="h-9 w-9 rounded-full border-2 border-white bg-[#159a7a]" />
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-[#c9f23b] text-xs font-black text-[#082b62]">+5k</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="absolute -bottom-5 -right-4 flex items-center gap-3 rounded-2xl bg-[#082b62] px-5 py-4 text-white shadow-xl">
-              <div className="rounded-xl bg-[#c9f23b] p-2 text-[#082b62]">
-                <PackageCheck size={22} />
-              </div>
-              <div>
-                <p className="text-xl font-black">5,000+</p>
-                <p className="text-xs text-blue-100">orders fulfilled</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="border-b border-slate-100 bg-white py-7">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-12 gap-y-5 px-5 text-sm font-bold text-slate-500 lg:justify-between lg:px-8">
-          <span className="flex items-center gap-3">
-            <ShieldCheck className="text-[#159a7a]" /> ISO-certified products
-          </span>
-          <span className="flex items-center gap-3">
-            <Truck className="text-[#0b6fce]" /> Fast &amp; safe delivery
-          </span>
-          <span className="flex items-center gap-3">
-            <HeartHandshake className="text-[#e25d54]" /> Trusted support
-          </span>
-          <span className="flex items-center gap-3">
-            <Users className="text-[#d09921]" /> 500+ happy partners
-          </span>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-5 py-16 lg:px-8">
-        <div className="mb-8">
-          <p className="mb-2 text-sm font-extrabold uppercase tracking-[0.18em] text-[#159a7a]">Shop by category</p>
-          <h2 className="text-3xl font-black tracking-tight text-[#082b62] sm:text-4xl">Care essentials for every need</h2>
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          {categories.map((category: Category) => {
-            const { icon: Icon, tone } = categoryStyles[category];
-            const count = products?.filter((product: Product) => product.category === category).length;
-            return (
-              <button
-                key={category}
-                onClick={() => showCategory(category)}
-                className="group rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm transition hover:-translate-y-1 hover:border-blue-100 hover:shadow-xl"
+              <a
+                href={whatsAppLink(BULK_MESSAGE)}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 px-6 py-3.5 font-semibold text-navy transition hover:border-navy"
               >
-                <div className={`mb-5 flex h-14 w-14 items-center justify-center rounded-2xl ${tone}`}>
-                  <Icon size={26} />
-                </div>
-                <p className="font-extrabold text-[#082b62]">{category}</p>
-                <p className="mt-1 text-xs font-semibold text-slate-400">
-                  {count === undefined ? 'Loading…' : `${count} ${count === 1 ? 'product' : 'products'}`}
-                </p>
-              </button>
-            );
-          })}
+                <WhatsAppIcon size={19} className="text-whatsapp" /> Get a bulk rate
+              </a>
+            </div>
+            <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm font-medium text-slate-600">
+              {['Sterile, single-use', 'Wholesale and retail', 'Government and local supply'].map((point: string) => (
+                <li key={point} className="flex items-center gap-2">
+                  <Check size={16} className="text-leaf" /> {point}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <img
+            className="h-72 w-full rounded-xl object-cover sm:h-96 lg:h-[440px]"
+            src="https://images.pexels.com/photos/7722555/pexels-photo-7722555.jpeg?auto=compress&cs=tinysrgb&w=1200"
+            alt="Sterile disposable syringes in sealed packs"
+          />
         </div>
       </section>
 
-      <section id="products" className="scroll-mt-20 bg-[#f1f7fb] py-16">
+      <section id="syringes" className="mx-auto max-w-7xl scroll-mt-32 px-5 py-14 md:scroll-mt-16 lg:px-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold text-navy sm:text-3xl">Syringes and needles</h2>
+            <p className="mt-2 max-w-2xl text-slate-600">Sterile and individually packed, sold by the box. Prices include taxes; for larger quantities, ask us for a bulk rate.</p>
+          </div>
+          <a href={whatsAppLink(BULK_MESSAGE)} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-brand hover:underline">
+            <WhatsAppIcon size={16} className="text-whatsapp" /> Ask for a bulk rate
+          </a>
+        </div>
+        {!products ? (
+          <div className="mt-8">{catalogueStatus}</div>
+        ) : (
+          <div className="mt-8 overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div aria-hidden="true" className="hidden grid-cols-[3.5rem_1fr_8rem_6rem_8.5rem] gap-x-5 border-b border-slate-200 bg-slate-50 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 sm:grid">
+              <span className="col-span-2">Product</span>
+              <span>Pack</span>
+              <span>Price</span>
+            </div>
+            <ul className="divide-y divide-slate-100">
+              {syringeRange.map((product: Product) => (
+                <li key={product.id} className="grid grid-cols-[3.5rem_1fr] items-center gap-x-4 px-4 py-3 sm:grid-cols-[3.5rem_1fr_8rem_6rem_8.5rem] sm:gap-x-5 sm:px-5">
+                  <img src={product.image} alt="" loading="lazy" className="h-14 w-14 rounded-lg object-cover" />
+                  <div className="min-w-0">
+                    <Link to={`/product/${product.id}`} className="font-semibold leading-snug text-navy transition hover:text-brand">
+                      {product.name}
+                    </Link>
+                    {product.badge && <span className="ml-2 inline-block rounded bg-leaf-soft px-1.5 py-0.5 align-middle text-[11px] font-semibold text-leaf">{product.badge}</span>}
+                    <p className="mt-0.5 text-sm text-slate-500 sm:hidden">
+                      {product.unit} · <span className="font-semibold text-navy">{formatPrice(product.price)}</span>
+                    </p>
+                    <StockNote stock={product.stock} className="mt-0.5" />
+                  </div>
+                  <p className="hidden text-sm text-slate-600 sm:block">{product.unit}</p>
+                  <p className="hidden font-semibold text-navy sm:block">{formatPrice(product.price)}</p>
+                  <div className="col-start-2 mt-2 sm:col-start-auto sm:mt-0 sm:justify-self-end">
+                    <AddToCart product={product} {...shop} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
+
+      <section id="products" className="scroll-mt-32 border-y border-slate-200 bg-white py-14 md:scroll-mt-16">
         <div className="mx-auto max-w-7xl px-5 lg:px-8">
-          <p className="mb-2 text-sm font-extrabold uppercase tracking-[0.18em] text-[#159a7a]">Customer favourites</p>
-          <h2 className="text-3xl font-black tracking-tight text-[#082b62] sm:text-4xl">Quality supplies, honest prices</h2>
+          <h2 className="text-2xl font-semibold text-navy sm:text-3xl">All products</h2>
+          <p className="mt-2 text-slate-600">Everything we stock, from syringes and needles to masks, gloves and dressings.</p>
           <div className="mb-8 mt-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex flex-wrap gap-2 text-sm font-bold">
+            <div className="flex flex-wrap gap-2 text-sm font-semibold">
               {[ALL_PRODUCTS, ...categories].map((category) => (
                 <button
                   key={category}
                   onClick={() => setActiveCategory(category)}
                   aria-pressed={activeCategory === category}
-                  className={`whitespace-nowrap rounded-full px-4 py-2 transition ${activeCategory === category ? 'bg-[#082b62] text-white' : 'bg-white text-slate-500 hover:text-[#082b62]'}`}
+                  className={`whitespace-nowrap rounded-lg border px-4 py-2 transition ${activeCategory === category ? 'border-navy bg-navy text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-navy hover:text-navy'}`}
                 >
                   {category}
                 </button>
               ))}
             </div>
-            <label className="flex shrink-0 items-center gap-2 text-sm font-bold text-slate-500">
+            <label className="flex shrink-0 items-center gap-2 text-sm font-semibold text-slate-500">
               Sort by
               <select
                 value={sort}
                 onChange={(event: ChangeEvent<HTMLSelectElement>) => setSort(event.target.value as Sort)}
-                className="rounded-full border border-slate-200 bg-white px-4 py-2 font-extrabold text-[#082b62] outline-none transition focus:border-[#0b6fce]"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-semibold text-navy outline-none transition focus:border-brand"
               >
                 {sortOptions.map(([value, label]) => (
                   <option key={value} value={value}>
@@ -252,31 +205,31 @@ export function HomePage({ products, catalogueError, reloadProducts, search, set
               Showing {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
               {activeCategory !== ALL_PRODUCTS && (
                 <>
-                  {' '}in <strong className="text-[#082b62]">{activeCategory}</strong>
+                  {' '}in <strong className="text-navy">{activeCategory}</strong>
                 </>
               )}
               {query && (
                 <>
-                  {' '}for “<strong className="text-[#082b62]">{search.trim()}</strong>”
+                  {' '}for “<strong className="text-navy">{search.trim()}</strong>”
                 </>
               )}
-              <button onClick={showAllProducts} className="-my-1 ml-3 py-1 font-extrabold text-[#0b6fce] hover:underline">
+              <button onClick={showAllProducts} className="-my-1 ml-3 py-1 font-semibold text-brand hover:underline">
                 Clear filters
               </button>
             </p>
           )}
           {!products ? (
-            catalogueError ? <LoadError message={catalogueError} retry={reloadProducts} /> : <Loading label="Loading products…" />
+            catalogueStatus
           ) : filteredProducts.length > 0 ? (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredProducts.map((product: Product) => (
                 <ProductCard key={product.id} product={product} {...shop} />
               ))}
             </div>
           ) : (
-            <div className="rounded-2xl bg-white p-12 text-center text-slate-500">
-              <p>No supplies match your search. Try another term or category.</p>
-              <button onClick={showAllProducts} className="mt-5 rounded-full bg-[#0b6fce] px-5 py-2.5 text-sm font-extrabold text-white transition hover:bg-[#082b62]">
+            <div className="rounded-xl border border-slate-200 p-12 text-center text-slate-500">
+              <p>No products match your search. Try another term or category.</p>
+              <button onClick={showAllProducts} className="mt-5 rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark">
                 Show all products
               </button>
             </div>
@@ -284,92 +237,86 @@ export function HomePage({ products, catalogueError, reloadProducts, search, set
         </div>
       </section>
 
-      <section id="why-us" className="mx-auto max-w-7xl px-5 py-16 lg:px-8">
+      <section className="mx-auto max-w-7xl px-5 py-14 lg:px-8">
         <div className="grid items-center gap-10 lg:grid-cols-2">
-          <div className="relative">
-            <img
-              className="h-72 w-full rounded-[2rem] object-cover shadow-xl sm:h-[420px]"
-              src="https://images.pexels.com/photos/5729400/pexels-photo-5729400.jpeg?auto=compress&cs=tinysrgb&w=1000"
-              alt="Syringe resting on a surgical mask"
-              loading="lazy"
-            />
-            <div className="absolute -bottom-5 -right-2 rounded-2xl bg-white p-4 shadow-xl sm:right-5">
-              <div className="flex items-center gap-3">
-                <div className="rounded-xl bg-emerald-50 p-3 text-[#159a7a]">
-                  <Clock3 size={22} />
-                </div>
-                <div>
-                  <p className="font-black text-[#082b62]">On-time delivery</p>
-                  <p className="text-xs font-semibold text-slate-400">Always, every time</p>
-                </div>
-              </div>
-            </div>
-          </div>
           <div>
-            <p className="mb-2 text-sm font-extrabold uppercase tracking-[0.18em] text-[#159a7a]">Why YourEcom</p>
-            <h2 className="max-w-lg text-4xl font-black leading-tight tracking-tight text-[#082b62]">The care behind every order.</h2>
-            <p className="mt-5 max-w-lg text-base leading-7 text-slate-600">
-              From first click to final delivery, we make sourcing everyday medical essentials feel simple, safe and dependable.
+            <h2 className="text-2xl font-semibold text-navy sm:text-3xl">Government and local supply</h2>
+            <p className="mt-3 max-w-xl leading-7 text-slate-600">
+              We supply all types of medical disposables to government hospitals and institutions. Local supply to hospitals, clinics and health centres is also available.
             </p>
-            <div className="mt-7 grid gap-5 sm:grid-cols-2">
-              {reasons.map(([number, title, description]) => (
-                <div key={number} className="flex gap-3">
-                  <span className="text-sm font-black text-[#0b86d8]">{number}</span>
-                  <div>
-                    <h3 className="font-extrabold text-[#082b62]">{title}</h3>
-                    <p className="mt-1 text-sm leading-5 text-slate-500">{description}</p>
-                  </div>
-                </div>
+            <ul className="mt-6 grid gap-3 sm:grid-cols-2">
+              {buyers.map(([Icon, label]) => (
+                <li key={label} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-navy">
+                  <Icon size={20} className="shrink-0 text-brand" /> {label}
+                </li>
               ))}
-            </div>
+            </ul>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-6 sm:p-8">
+            <h3 className="font-semibold text-navy">We supply all types of medical disposables</h3>
+            <ul className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 text-sm text-slate-700">
+              {supplies.map((supply: string) => (
+                <li key={supply} className="flex items-center gap-2.5">
+                  <Check size={16} className="shrink-0 text-leaf" /> {supply}
+                </li>
+              ))}
+            </ul>
+            <a href={whatsAppLink()} target="_blank" rel="noreferrer" className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-brand hover:underline">
+              <WhatsAppIcon size={16} className="text-whatsapp" /> Ask about a product
+            </a>
           </div>
         </div>
+        <ul className="mt-12 grid gap-6 border-t border-slate-200 pt-10 sm:grid-cols-2 lg:grid-cols-4">
+          {promises.map(([Icon, title, text]) => (
+            <li key={title} className="flex gap-4">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand">
+                <Icon size={21} />
+              </span>
+              <div>
+                <h3 className="font-semibold text-navy">{title}</h3>
+                <p className="mt-1 text-sm leading-6 text-slate-600">{text}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
       </section>
 
-      <div className="mx-auto mb-16 max-w-7xl px-5 lg:px-8">
-        <section id="bulk" className="scroll-mt-40 overflow-hidden rounded-[2rem] bg-[#082b62] md:scroll-mt-24">
-          <div className="relative flex flex-col justify-between gap-8 px-6 py-10 sm:px-12 lg:flex-row lg:items-center lg:py-12">
-            <div className="absolute right-0 top-0 h-full w-1/2 bg-[radial-gradient(circle_at_center,_rgba(11,134,216,.35),_transparent_65%)]" />
-            <div className="relative">
-              <p className="mb-2 text-sm font-extrabold uppercase tracking-[0.18em] text-[#c9f23b]">Need more than a box?</p>
-              <h2 className="max-w-xl text-3xl font-black text-white sm:text-4xl">Stock up smart with our bulk orders.</h2>
-              <p className="mt-3 max-w-xl text-blue-100">Get custom pricing, dedicated support and reliable supply for your hospital, clinic or business.</p>
-            </div>
-            <div className="relative flex shrink-0 flex-col gap-3 sm:flex-row">
-              <a href="tel:+919643821551" className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full bg-[#c9f23b] px-5 py-4 text-sm font-black text-[#082b62] transition hover:bg-white sm:px-6 sm:text-base">
-                <Phone size={18} /> Call +91 96438 21551
-              </a>
-              <a
-                href="mailto:hello@yourecom.in?subject=Bulk%20order%20enquiry"
-                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full border-2 border-white/30 px-5 py-4 text-sm font-black text-white transition hover:border-white hover:bg-white/10 sm:px-6 sm:text-base"
-              >
-                <Mail size={18} /> Email for a quote
-              </a>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <section id="contact" className="scroll-mt-20 border-t border-slate-100 bg-white py-14">
-        <div className="mx-auto grid max-w-7xl gap-10 px-5 lg:grid-cols-[1fr_auto] lg:px-8">
+      <section id="contact" className="scroll-mt-32 bg-navy md:scroll-mt-16">
+        <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 lg:grid-cols-[1.4fr_1fr] lg:items-center lg:px-8">
           <div>
-            <p className="text-lg font-extrabold text-[#082b62]">Need help choosing supplies?</p>
-            <p className="mt-2 text-slate-500">
-              Call us at{' '}
-              <a href="tel:+919643821551" className="font-bold text-[#0b6fce] hover:underline">
-                +91 96438 21551
-              </a>{' '}
-              or email{' '}
-              <a href="mailto:hello@yourecom.in" className="font-bold text-[#0b6fce] hover:underline">
-                hello@yourecom.in
-              </a>
+            <h2 className="text-2xl font-semibold text-white sm:text-3xl">Buying in bulk?</h2>
+            <p className="mt-3 max-w-xl leading-7 text-blue-100">
+              Send us the sizes and quantities you need on WhatsApp, or call us. We will share a quotation for your hospital, clinic or institution.
             </p>
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+              <a
+                href={whatsAppLink(BULK_MESSAGE)}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-6 py-3.5 font-semibold text-navy transition hover:bg-brand-soft"
+              >
+                <WhatsAppIcon size={19} className="text-whatsapp" /> WhatsApp for a quote
+              </a>
+              <a href={PHONE_LINK} className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/30 px-6 py-3.5 font-semibold text-white transition hover:bg-white/10">
+                <Phone size={18} /> Call {PHONE}
+              </a>
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-slate-400" aria-hidden="true">
-            <Instagram size={18} />
-            <Facebook size={18} />
-            <Youtube size={18} />
-          </div>
+          <address className="rounded-xl border border-white/15 bg-white/5 p-6 not-italic text-blue-100">
+            <p className="font-display text-lg font-semibold text-white">YourEcom</p>
+            <p className="text-sm">Medical disposable wholesaler</p>
+            <p className="mt-4 flex gap-3">
+              <MapPin size={18} className="mt-0.5 shrink-0 text-blue-300" />
+              <span>
+                {ADDRESS[0]}
+                <br />
+                {ADDRESS[1]}
+              </span>
+            </p>
+            <a href={MAP_LINK} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-white hover:underline">
+              Get directions <ArrowRight size={15} />
+            </a>
+          </address>
         </div>
       </section>
     </main>

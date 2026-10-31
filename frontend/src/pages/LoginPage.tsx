@@ -72,29 +72,22 @@ export function LoginPage({ user, signIn }: LoginPageProps) {
   };
 
   return (
-    <main className="min-h-[calc(100vh-120px)] bg-[#eaf7ff] px-5 py-12">
-      <div className="mx-auto grid max-w-5xl grid-cols-1 overflow-hidden rounded-[2rem] bg-white shadow-2xl shadow-blue-100 lg:grid-cols-2">
-        <div className="relative hidden overflow-hidden bg-[#082b62] p-12 lg:block">
-          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#0b86d8]/40 blur-2xl" />
-          <div className="absolute -bottom-20 -left-20 h-72 w-72 rounded-full bg-[#159a7a]/30 blur-2xl" />
-          <div className="relative z-10 flex h-full flex-col justify-between">
+    <main className="min-h-[calc(100vh-120px)] bg-brand-soft px-5 py-12">
+      <div className="mx-auto grid max-w-5xl grid-cols-1 overflow-hidden rounded-xl bg-white shadow-xl lg:grid-cols-2">
+        <div className="hidden bg-navy p-12 lg:block">
+          <div className="flex h-full flex-col justify-between">
             <div>
-              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#c9f23b] text-3xl font-black text-[#082b62]">+</span>
-              <p className="mt-12 text-sm font-extrabold uppercase tracking-[0.18em] text-[#c9f23b]">Your healthcare shelf</p>
-              <p className="mt-4 font-['Plus_Jakarta_Sans'] text-5xl font-black leading-tight text-white">
-                Care that
-                <br />
-                <span className="text-[#57c4ff]">stays close.</span>
-              </p>
-              <p className="mt-6 max-w-sm leading-7 text-blue-100">Save your details, track orders and get faster access to the supplies your family or practice needs.</p>
+              <p className="text-sm font-semibold text-blue-200">Your YourEcom account</p>
+              <p className="mt-4 font-display text-4xl font-semibold leading-tight text-white">Order syringes and medical disposables in a few clicks.</p>
+              <p className="mt-6 max-w-sm leading-7 text-blue-100">Save your delivery details, track your orders and reorder the supplies your hospital, clinic or store uses most.</p>
             </div>
-            <div className="flex items-center gap-3 text-sm font-bold text-white">
-              <ShieldCheck className="text-[#c9f23b]" /> Safe, private and simple
+            <div className="flex items-center gap-3 text-sm font-semibold text-white">
+              <ShieldCheck className="text-emerald-300" /> Your details stay private
             </div>
           </div>
         </div>
         <div className="p-7 sm:p-12">
-          <Link to="/" className="mb-10 inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-[#0b6fce]">
+          <Link to="/" className="mb-10 inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-brand">
             <ArrowLeft size={16} /> Back to store
           </Link>
           <div className="flex gap-7 border-b border-slate-100">
@@ -104,13 +97,13 @@ export function LoginPage({ user, signIn }: LoginPageProps) {
                 type="button"
                 onClick={() => switchMode(value)}
                 aria-pressed={mode === value}
-                className={`pb-4 text-sm font-extrabold ${mode === value ? 'border-b-2 border-[#0b6fce] text-[#0b6fce]' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`pb-4 text-sm font-semibold ${mode === value ? 'border-b-2 border-brand text-brand' : 'text-slate-400 hover:text-slate-600'}`}
               >
                 {value === 'login' ? 'Sign in' : 'Create account'}
               </button>
             ))}
           </div>
-          <h1 className="mt-8 text-3xl font-black text-[#082b62]">{isLogin ? 'Welcome back.' : 'Join YourEcom.'}</h1>
+          <h1 className="mt-8 text-3xl font-semibold text-navy">{isLogin ? 'Welcome back.' : 'Join YourEcom.'}</h1>
           <p className="mt-2 text-slate-500">
             {from ? 'Please sign in to continue.' : isLogin ? 'Sign in to view your orders and saved details.' : 'Create your account for a smoother care experience.'}
           </p>
@@ -144,7 +137,7 @@ export function LoginPage({ user, signIn }: LoginPageProps) {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  className="-m-2 shrink-0 rounded-full p-2 text-slate-400 transition hover:text-[#0b6fce]"
+                  className="-m-2 shrink-0 rounded-full p-2 text-slate-400 transition hover:text-brand"
                 >
                   {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                 </button>
@@ -152,31 +145,31 @@ export function LoginPage({ user, signIn }: LoginPageProps) {
             />
             {isLogin && (
               <p className="-mt-1 text-right text-sm">
-                <Link to="/forgot-password" state={{ email: values.email.trim() }} className="font-bold text-[#0b6fce] hover:underline">
+                <Link to="/forgot-password" state={{ email: values.email.trim() }} className="font-bold text-brand hover:underline">
                   Forgot password?
                 </Link>
               </p>
             )}
             {formError && (
-              <p role="alert" className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+              <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
                 {formError}
               </p>
             )}
             <button
               type="submit"
               disabled={pending}
-              className="w-full rounded-full bg-[#0b6fce] py-4 font-extrabold text-white transition hover:bg-[#082b62] disabled:cursor-wait disabled:opacity-60"
+              className="w-full rounded-lg bg-brand py-4 font-semibold text-white transition hover:bg-navy disabled:cursor-wait disabled:opacity-60"
             >
               {pending ? 'Please wait…' : isLogin ? 'Sign in to YourEcom' : 'Create my account'}
             </button>
           </form>
           <p className="mt-6 text-center text-sm font-semibold text-slate-400">
             By continuing, you agree to our{' '}
-            <Link to="/policies/terms" className="text-slate-500 underline underline-offset-2 hover:text-[#0b6fce]">
+            <Link to="/policies/terms" className="text-slate-500 underline underline-offset-2 hover:text-brand">
               terms of use
             </Link>{' '}
             and{' '}
-            <Link to="/policies/privacy" className="text-slate-500 underline underline-offset-2 hover:text-[#0b6fce]">
+            <Link to="/policies/privacy" className="text-slate-500 underline underline-offset-2 hover:text-brand">
               privacy policy
             </Link>
             .

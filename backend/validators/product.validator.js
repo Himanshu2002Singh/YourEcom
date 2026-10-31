@@ -1,7 +1,7 @@
 import { HttpError } from '../utils/HttpError.js';
 
 // The storefront's categories (frontend/src/data/categories.ts). Every product is in one of them.
-export const CATEGORIES = ['Face Masks', 'Gloves', 'Syringes', 'IV Sets', 'Bandages', 'Gauze & Cotton'];
+export const CATEGORIES = ['Syringes', 'Needles', 'IV Sets', 'Face Masks', 'Gloves', 'Bandages', 'Gauze & Cotton'];
 const MAX_SEARCH = 100;
 
 // GET /api/products?category=Gloves&q=nitrile — both filters are optional.

@@ -18,8 +18,8 @@ const sizes = {
 };
 
 const tones = {
-  brand: { box: 'bg-[#0b6fce] text-white shadow-lg shadow-blue-200', button: 'hover:bg-white/15' },
-  light: { box: 'bg-slate-100 text-[#082b62]', button: 'hover:bg-slate-200' },
+  brand: { box: 'bg-brand text-white shadow-lg', button: 'hover:bg-white/15' },
+  light: { box: 'bg-slate-100 text-navy', button: 'hover:bg-slate-200' },
   dark: { box: 'bg-white/10 text-white', button: 'hover:bg-white/20' },
 };
 
@@ -30,7 +30,7 @@ export function QuantityStepper({ quantity, onChange, label, max = MAX_QUANTITY,
   const limit = Math.min(max, MAX_QUANTITY);
   const { box, button, input, icon } = sizes[size];
   const colors = tones[tone];
-  const buttonClass = `flex h-full ${button} shrink-0 items-center justify-center rounded-full transition ${colors.button} disabled:opacity-40 disabled:hover:bg-transparent`;
+  const buttonClass = `flex h-full ${button} shrink-0 items-center justify-center rounded-md transition ${colors.button} disabled:opacity-40 disabled:hover:bg-transparent`;
 
   const type = (event: ChangeEvent<HTMLInputElement>): void => {
     const digits = event.target.value.replace(/\D/g, '').slice(0, String(MAX_QUANTITY).length);
@@ -43,7 +43,7 @@ export function QuantityStepper({ quantity, onChange, label, max = MAX_QUANTITY,
   };
 
   return (
-    <div className={`inline-flex shrink-0 items-center rounded-full ${box} ${colors.box}`}>
+    <div className={`inline-flex shrink-0 items-center rounded-lg ${box} ${colors.box}`}>
       <button
         type="button"
         onClick={() => onChange(quantity - 1)}
@@ -60,7 +60,7 @@ export function QuantityStepper({ quantity, onChange, label, max = MAX_QUANTITY,
         onKeyDown={blurOnEnter}
         inputMode="numeric"
         aria-label={`Quantity of ${label}`}
-        className={`${input} bg-transparent text-center font-black outline-none`}
+        className={`${input} bg-transparent text-center font-bold outline-none`}
       />
       <button type="button" onClick={() => onChange(quantity + 1)} disabled={quantity >= limit} aria-label={`Increase ${label} quantity`} className={buttonClass}>
         <Plus size={icon} />

@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS products (
   features    JSON          NOT NULL    -- short selling points, as a list
 );
 
--- The storefront's six products; the frontend loads them from GET /api/products. Rows that already exist are left alone.
+-- The storefront's products; the frontend loads them from GET /api/products. Rows that already exist are left alone.
+-- Syringes are the client's main line: one product per size. Prices and specs are placeholders until the client's price list.
 INSERT IGNORE INTO products (id, name, category, price, unit, stock, badge, image, description, features) VALUES
   (1, '3-Ply Protective Face Masks', 'Face Masks', 249, 'Box of 50', 240, 'Best seller',
    'https://images.pexels.com/photos/9502813/pexels-photo-9502813.jpeg?auto=compress&cs=tinysrgb&w=1000',
@@ -37,10 +38,10 @@ INSERT IGNORE INTO products (id, name, category, price, unit, stock, badge, imag
    'https://images.pexels.com/photos/7856715/pexels-photo-7856715.jpeg?auto=compress&cs=tinysrgb&w=1000',
    'Powder-free nitrile gloves designed for a secure fit, excellent dexterity and hygienic everyday protection.',
    '["Powder-free finish", "Latex-free material", "Textured fingertips"]'),
-  (3, 'Sterile Disposable Syringes', 'Syringes', 399, 'Pack of 100', 150, NULL,
+  (3, '2 ml Disposable Syringe with Needle', 'Syringes', 280, 'Box of 100', 150, NULL,
    'https://images.pexels.com/photos/7722564/pexels-photo-7722564.jpeg?auto=compress&cs=tinysrgb&w=1000',
-   'Sterile, single-use syringes made for accurate and reliable administration in professional settings.',
-   '["Individually packed", "Clear barrel markings", "Single-use sterile pack"]'),
+   'Sterile, single-use 2 ml syringes with a 24G needle fitted, for routine intramuscular and subcutaneous injections.',
+   '["24G × 25 mm needle fitted", "Clear barrel, bold markings", "Individually blister packed"]'),
   (4, 'IV Administration Set', 'IV Sets', 899, 'Pack of 25', 8, 'New',
    'https://images.pexels.com/photos/6191530/pexels-photo-6191530.jpeg?auto=compress&cs=tinysrgb&w=1000',
    'High-quality administration sets for dependable fluid delivery and easy clinical handling.',
@@ -52,7 +53,39 @@ INSERT IGNORE INTO products (id, name, category, price, unit, stock, badge, imag
   (6, 'Elastic Adhesive Bandages', 'Bandages', 179, 'Pack of 50', 300, NULL,
    'https://images.pexels.com/photos/7722845/pexels-photo-7722845.jpeg?auto=compress&cs=tinysrgb&w=1000',
    'Reliable adhesive bandages for small cuts, scrapes and daily first-aid kits.',
-   '["Flexible fabric backing", "Secure skin-friendly adhesive", "Individual hygienic wraps"]');
+   '["Flexible fabric backing", "Secure skin-friendly adhesive", "Individual hygienic wraps"]'),
+  (7, '3 ml Disposable Syringe with Needle', 'Syringes', 320, 'Box of 100', 140, NULL,
+   'https://images.pexels.com/photos/7722558/pexels-photo-7722558.jpeg?auto=compress&cs=tinysrgb&w=1000',
+   'Sterile, single-use 3 ml syringes with a 23G needle fitted, a common size for clinics and dispensaries.',
+   '["23G × 25 mm needle fitted", "Clear barrel, bold markings", "Individually blister packed"]'),
+  (8, '5 ml Disposable Syringe with Needle', 'Syringes', 390, 'Box of 100', 200, NULL,
+   'https://images.pexels.com/photos/7722569/pexels-photo-7722569.jpeg?auto=compress&cs=tinysrgb&w=1000',
+   'Sterile, single-use 5 ml syringes with a 23G needle fitted, for injections and drawing up medicines.',
+   '["23G × 25 mm needle fitted", "Smooth-gliding plunger", "Individually blister packed"]'),
+  (9, '10 ml Disposable Syringe with Needle', 'Syringes', 620, 'Box of 100', 120, NULL,
+   'https://images.pexels.com/photos/7722554/pexels-photo-7722554.jpeg?auto=compress&cs=tinysrgb&w=1000',
+   'Sterile, single-use 10 ml syringes with a 22G needle fitted, for larger doses, flushing and dilution.',
+   '["22G × 38 mm needle fitted", "Smooth-gliding plunger", "Individually blister packed"]'),
+  (10, '20 ml Disposable Syringe with Needle', 'Syringes', 490, 'Box of 50', 80, NULL,
+   'https://images.pexels.com/photos/7723202/pexels-photo-7723202.jpeg?auto=compress&cs=tinysrgb&w=1000',
+   'Sterile, single-use 20 ml syringes with a 21G needle fitted, for irrigation, flushing and larger volumes.',
+   '["21G × 38 mm needle fitted", "Large, easy-read markings", "Individually blister packed"]'),
+  (11, '50 ml Disposable Syringe, Luer Lock', 'Syringes', 750, 'Box of 25', 40, NULL,
+   'https://images.pexels.com/photos/24032781/pexels-photo-24032781.jpeg?auto=compress&cs=tinysrgb&w=1000',
+   'Sterile 50 ml syringes with a luer lock tip, for syringe pumps, feeding and irrigation. Supplied without a needle.',
+   '["Luer lock tip", "Fits common syringe pumps", "Individually blister packed"]'),
+  (12, '1 ml Insulin Syringe, U-100', 'Syringes', 690, 'Box of 100', 90, NULL,
+   'https://images.pexels.com/photos/15754963/pexels-photo-15754963.jpeg?auto=compress&cs=tinysrgb&w=1000',
+   'Sterile 1 ml insulin syringes marked in U-100 units, with a fine 30G needle fixed to the barrel for comfortable injections.',
+   '["U-100 unit markings", "30G × 8 mm fixed needle", "Low dead space"]'),
+  (13, '0.5 ml Auto-Disable Syringe', 'Syringes', 420, 'Box of 100', 100, 'Govt. supply',
+   'https://images.pexels.com/photos/7722598/pexels-photo-7722598.jpeg?auto=compress&cs=tinysrgb&w=1000',
+   'Auto-disable syringes that lock after a single use and cannot be refilled, as used in immunisation programmes.',
+   '["Locks after one use", "23G × 25 mm needle fitted", "For immunisation drives"]'),
+  (14, 'Hypodermic Needles, 24G', 'Needles', 140, 'Box of 100', 160, NULL,
+   'https://images.pexels.com/photos/4074691/pexels-photo-4074691.jpeg?auto=compress&cs=tinysrgb&w=1000',
+   'Sterile hypodermic needles with a colour-coded hub, to fit any luer slip or luer lock syringe.',
+   '["24G × 25 mm", "Colour-coded hub", "Luer slip and lock fit"]');
 
 -- What a customer bought. Items and totals are copied when the order is placed, so later
 -- price changes never rewrite an old order.

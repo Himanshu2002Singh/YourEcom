@@ -25,7 +25,7 @@ function SaveRow({ label, state, disabled }: { label: string; state: SaveState; 
       <button
         type="submit"
         disabled={state.saving || disabled}
-        className="rounded-full bg-[#0b6fce] px-5 py-2.5 text-sm font-extrabold text-white transition hover:bg-[#082b62] disabled:cursor-not-allowed disabled:opacity-50"
+        className="rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-navy disabled:cursor-not-allowed disabled:opacity-50"
       >
         {state.saving ? 'Saving…' : label}
       </button>
@@ -35,7 +35,7 @@ function SaveRow({ label, state, disabled }: { label: string; state: SaveState; 
         </p>
       ) : (
         state.done && (
-          <p role="status" className="text-sm font-semibold text-[#159a7a]">
+          <p role="status" className="text-sm font-semibold text-leaf">
             {state.done}
           </p>
         )
@@ -61,8 +61,8 @@ function NameForm({ name, saveName }: { name: string; saveName: ProfilePageProps
   };
 
   return (
-    <form onSubmit={submit} noValidate className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-      <h2 className="text-xl font-black text-[#082b62]">Your name</h2>
+    <form onSubmit={submit} noValidate className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+      <h2 className="text-xl font-semibold text-navy">Your name</h2>
       <p className="mt-1 text-sm text-slate-500">Used on your account and as the default name for deliveries.</p>
       <div className="mt-6">
         <TextField
@@ -108,8 +108,8 @@ function PasswordForm({ changePassword }: { changePassword: ProfilePageProps['ch
   };
 
   return (
-    <form onSubmit={submit} noValidate className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-      <h2 className="text-xl font-black text-[#082b62]">Change password</h2>
+    <form onSubmit={submit} noValidate className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+      <h2 className="text-xl font-semibold text-navy">Change password</h2>
       <p className="mt-1 text-sm text-slate-500">You’ll stay signed in here; other devices are signed out.</p>
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         <TextField name="current-password" label="Current password" type="password" icon={LockKeyhole} autoComplete="current-password" value={current} onChange={typed(setCurrent)} />
@@ -148,57 +148,57 @@ export function ProfilePage({ user, orders, signOut, updatePreferences, saveName
     <main className="mx-auto max-w-7xl px-5 py-10 lg:px-8">
       <div className="mb-10 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
         <div>
-          <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-[#159a7a]">Your account</p>
-          <h1 className="mt-2 break-words text-4xl font-black text-[#082b62]">Hello, {user.name.split(' ')[0]}.</h1>
+          <p className="text-sm font-semibold uppercase tracking-wider text-leaf">Your account</p>
+          <h1 className="mt-2 break-words text-4xl font-semibold text-navy">Hello, {user.name.split(' ')[0]}.</h1>
           <p className="mt-2 text-slate-500">Manage your details and keep your care essentials close.</p>
         </div>
         <button
           onClick={signOut}
-          className="self-start rounded-full border border-slate-200 px-5 py-2.5 text-sm font-extrabold text-slate-500 transition hover:border-[#0b6fce] hover:text-[#0b6fce]"
+          className="self-start rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-500 transition hover:border-brand hover:text-brand"
         >
           Sign out
         </button>
       </div>
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <div className="min-w-0 rounded-3xl bg-[#082b62] p-6 text-white lg:col-span-2">
+        <div className="min-w-0 rounded-xl bg-navy p-6 text-white lg:col-span-2">
           <div className="flex flex-col items-start gap-4 sm:flex-row sm:justify-between">
             <div className="min-w-0 max-w-full">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#c9f23b] text-2xl font-black text-[#082b62]">{initials}</div>
-              <h2 className="mt-5 break-words text-2xl font-black">{user.name}</h2>
+              <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-white text-2xl font-bold text-navy">{initials}</div>
+              <h2 className="mt-5 break-words text-2xl font-semibold">{user.name}</h2>
               <p className="mt-1 break-words text-blue-200">{user.email}</p>
             </div>
-            <span className="shrink-0 rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-[#c9f23b]">Member since {user.memberSince}</span>
+            <span className="shrink-0 rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-blue-100">Member since {user.memberSince}</span>
           </div>
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
             {stats.map(([value, label]) => (
-              <div key={label} className="rounded-2xl bg-white/10 p-4">
-                <p className="text-2xl font-black">{value}</p>
+              <div key={label} className="rounded-xl bg-white/10 p-4">
+                <p className="text-2xl font-bold">{value}</p>
                 <p className="mt-1 text-xs text-blue-200">{label}</p>
               </div>
             ))}
           </div>
         </div>
-        <Link to="/orders" className="group rounded-3xl border border-slate-100 bg-white p-6 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-50 text-[#0b6fce]">
+        <Link to="/orders" className="group rounded-xl border border-slate-100 bg-white p-6 text-left shadow-sm transition hover:shadow-md">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-soft text-brand">
             <PackageOpen />
           </div>
-          <h3 className="mt-5 text-xl font-black text-[#082b62]">My orders</h3>
+          <h3 className="mt-5 text-xl font-bold text-navy">My orders</h3>
           <p className="mt-2 text-sm leading-6 text-slate-500">Track deliveries and view your purchase history.</p>
-          <span className="mt-5 flex items-center gap-2 text-sm font-extrabold text-[#0b6fce]">
+          <span className="mt-5 flex items-center gap-2 text-sm font-semibold text-brand">
             View orders <ArrowRight size={16} className="transition group-hover:translate-x-1" />
           </span>
         </Link>
       </div>
       <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-black text-[#082b62]">Saved address</h2>
+        <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-semibold text-navy">Saved address</h2>
           {savedAddress ? (
             <div className="mt-6 flex gap-3">
-              <div className="h-fit rounded-xl bg-emerald-50 p-3 text-[#159a7a]">
+              <div className="h-fit rounded-xl bg-emerald-50 p-3 text-leaf">
                 <MapPin size={19} />
               </div>
               <div>
-                <p className="font-extrabold text-[#082b62]">{savedAddress.name}</p>
+                <p className="font-semibold text-navy">{savedAddress.name}</p>
                 <p className="mt-1 text-sm leading-6 text-slate-500">
                   {savedAddress.address},
                   <br />
@@ -211,8 +211,8 @@ export function ProfilePage({ user, orders, signOut, updatePreferences, saveName
             <p className="mt-6 text-sm leading-6 text-slate-500">Your delivery address is saved here after your first order.</p>
           )}
         </div>
-        <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-black text-[#082b62]">Account preferences</h2>
+        <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-semibold text-navy">Account preferences</h2>
           <div className="mt-6 space-y-4">
             {preferenceOptions.map(([key, label]) => (
               <label key={key} className="flex cursor-pointer items-center justify-between text-sm font-bold text-slate-600">
@@ -221,7 +221,7 @@ export function ProfilePage({ user, orders, signOut, updatePreferences, saveName
                   type="checkbox"
                   checked={user.preferences[key]}
                   onChange={(event: ChangeEvent<HTMLInputElement>) => updatePreferences({ ...user.preferences, [key]: event.target.checked })}
-                  className="h-5 w-5 accent-[#0b6fce]"
+                  className="h-5 w-5 accent-brand"
                 />
               </label>
             ))}

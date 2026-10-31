@@ -48,19 +48,19 @@ export function CouponBox({ subtotal, coupon, setCoupon }: CouponBoxProps) {
   const discount = coupon ? discountFor(coupon, subtotal) : 0;
 
   return (
-    <div className="mt-6 rounded-2xl bg-white/5 p-4">
-      <p className="flex items-center gap-2 text-sm font-extrabold">
-        <TicketPercent size={17} className="text-[#c9f23b]" /> Coupons and offers
+    <div className="mt-6 rounded-xl bg-white/5 p-4">
+      <p className="flex items-center gap-2 text-sm font-semibold">
+        <TicketPercent size={17} className="text-emerald-300" /> Coupons and offers
       </p>
       {coupon ? (
-        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-dashed border-[#c9f23b]/70 px-3 py-2.5">
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-dashed border-emerald-300/70 px-3 py-2.5">
           <div className="min-w-0" aria-live="polite">
-            <p className="font-black tracking-wide text-[#c9f23b]">{coupon.code} applied</p>
+            <p className="font-bold tracking-wide text-emerald-300">{coupon.code} applied</p>
             <p className="text-xs leading-5 text-blue-200">
               {discount > 0 ? `You save ${formatPrice(discount)}` : `Add ${formatPrice(coupon.minSubtotal - subtotal)} more to your cart to use this code`}
             </p>
           </div>
-          <button onClick={() => setCoupon(null)} className="shrink-0 rounded-full px-2 py-1 text-xs font-extrabold text-blue-100 transition hover:text-white">
+          <button onClick={() => setCoupon(null)} className="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-blue-100 transition hover:text-white">
             Remove
           </button>
         </div>
@@ -84,12 +84,12 @@ export function CouponBox({ subtotal, coupon, setCoupon }: CouponBoxProps) {
               maxLength={30}
               aria-invalid={Boolean(error)}
               aria-describedby={error ? 'coupon-error' : undefined}
-              className="min-w-0 flex-1 rounded-full border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-bold uppercase tracking-wide text-white placeholder:font-semibold placeholder:normal-case placeholder:tracking-normal placeholder:text-blue-200 focus:border-[#c9f23b] focus:outline-none"
+              className="min-w-0 flex-1 rounded-lg border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-bold uppercase tracking-wide text-white placeholder:font-semibold placeholder:normal-case placeholder:tracking-normal placeholder:text-blue-200 focus:border-emerald-300 focus:outline-none"
             />
             <button
               type="submit"
               disabled={checking}
-              className="shrink-0 rounded-full bg-[#c9f23b] px-4 py-2.5 text-sm font-black text-[#082b62] transition hover:bg-white disabled:cursor-wait disabled:opacity-60"
+              className="shrink-0 rounded-lg bg-white px-4 py-2.5 text-sm font-bold text-navy transition hover:bg-brand-soft disabled:cursor-wait disabled:opacity-60"
             >
               {checking ? 'Checking…' : 'Apply'}
             </button>
@@ -106,7 +106,7 @@ export function CouponBox({ subtotal, coupon, setCoupon }: CouponBoxProps) {
                 return (
                   <li key={offer.code} className="flex items-center justify-between gap-3 rounded-xl bg-white/5 px-3 py-2.5">
                     <div className="min-w-0">
-                      <p className="text-sm font-black tracking-wide text-white">{offer.code}</p>
+                      <p className="text-sm font-bold tracking-wide text-white">{offer.code}</p>
                       <p className="text-xs leading-5 text-blue-200">
                         {describeCoupon(offer)}
                         {short > 0 && ` · add ${formatPrice(short)} more`}
@@ -116,7 +116,7 @@ export function CouponBox({ subtotal, coupon, setCoupon }: CouponBoxProps) {
                       onClick={() => apply(offer)}
                       disabled={short > 0}
                       aria-label={`Apply ${offer.code}`}
-                      className="shrink-0 rounded-full px-2 py-1 text-xs font-black text-[#c9f23b] transition hover:text-white disabled:cursor-not-allowed disabled:text-blue-300/60"
+                      className="shrink-0 rounded-lg px-2 py-1 text-xs font-bold text-emerald-300 transition hover:text-white disabled:cursor-not-allowed disabled:text-blue-300/60"
                     >
                       Apply
                     </button>

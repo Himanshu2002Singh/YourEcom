@@ -97,7 +97,7 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
     assert.deepEqual(await call('/health'), { status: 200, body: { ok: true }, cookie: undefined });
   });
 
-  test('the storefront’s six products are seeded and filter by category and search text', async () => {
+  test('the storefront’s products are seeded and filter by category and search text', async () => {
     const { products } = (await call('/products')).body;
     assert.deepEqual(products.slice(0, 6).map(product => product.id), [1, 2, 3, 4, 5, 6]);
     const { stock, rating, reviewCount, ...first } = products[0];
@@ -120,7 +120,8 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
     const ids = async path => (await call(path)).body.products.map(product => product.id);
     assert.deepEqual(await ids('/products?category=Gloves'), [2]);
     assert.deepEqual(await ids(`/products?category=${encodeURIComponent('Gauze & Cotton')}`), [5]);
-    assert.deepEqual(await ids('/products?q=STERILE'), [3]);
+    assert.deepEqual(await ids('/products?category=Needles'), [14]);
+    assert.deepEqual(await ids('/products?q=INSULIN'), [12]);
     assert.deepEqual(await ids('/products?q=cotton&category=Bandages'), []);
     assert.deepEqual(await ids('/products?q=%25'), [], '% is matched as itself, not as a wildcard');
 
@@ -258,10 +259,10 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
   test('nobody can order more than is in stock', async () => {
     await query('UPDATE products SET stock = 1 WHERE id = 3');
     const order = quantity => call('/orders', { method: 'POST', cookie, body: { items: [{ id: 3, quantity }], delivery, paymentMethod: 'cod' } });
-    assert.deepEqual(await order(2), { status: 409, body: { error: 'Only 1 left of Sterile Disposable Syringes. Lower the quantity and try again.' }, cookie: undefined });
+    assert.deepEqual(await order(2), { status: 409, body: { error: 'Only 1 left of 2 ml Disposable Syringe with Needle. Lower the quantity and try again.' }, cookie: undefined });
     assert.equal((await order(1)).status, 201);
     assert.equal((await call('/products/3')).body.product.stock, 0);
-    assert.equal((await order(1)).body.error, 'Sterile Disposable Syringes is out of stock. Remove it from your cart to order the rest.');
+    assert.equal((await order(1)).body.error, '2 ml Disposable Syringe with Needle is out of stock. Remove it from your cart to order the rest.');
   });
 
   test('only customers who ordered a product can review it, once each', async () => {
