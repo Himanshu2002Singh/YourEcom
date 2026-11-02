@@ -1,47 +1,23 @@
-import { useMemo, useState, type ChangeEvent } from 'react';
 import { Link } from 'react-router';
-import { ArrowRight, BadgeCheck, Building2, Check, Headset, Hospital, Landmark, MapPin, Phone, ShieldCheck, Stethoscope, Truck, type LucideIcon } from 'lucide-react';
-import { AddToCart, LoadError, Loading, ProductCard, StockNote, WhatsAppIcon, type ShopActions } from '@/components/StoreShared';
-import { categories } from '@/data/categories';
-import { ADDRESS, MAP_LINK, PHONE, PHONE_LINK, whatsAppLink } from '@/data/contact';
+import { BadgeCheck, ChevronRight, Headset, Mail, MapPin, Phone, ShieldCheck, Truck, type LucideIcon } from 'lucide-react';
+import { LoadError, Loading, ProductCard, WhatsAppIcon, panel, type ShopActions } from '@/components/StoreShared';
+import { categories, categoryImages } from '@/data/categories';
+import { ADDRESS, EMAIL, MAP_LINK, PHONE, PHONE_LINK, whatsAppLink } from '@/data/contact';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { byCategory, categoryPath, discountOf, groupByFamily, groupName, variantSummary, type ProductGroup } from '@/lib/catalogue';
 import { formatPrice } from '@/lib/pricing';
 import type { Category, Product } from '@/types/store';
 
-const ALL_PRODUCTS = 'All products' as const;
-
-// The client's main line, shown as a price list right after the hero.
-const SYRINGE_RANGE: Category[] = ['Syringes', 'Needles'];
-
 const BULK_MESSAGE = 'Hello YourEcom, please share your bulk rate for syringes. Sizes and quantities I need: ';
+const QUOTE_MESSAGE = 'Hello YourEcom, please send a quotation for our hospital / clinic. Products and quantities: ';
 
-type Sort = 'featured' | 'price-low' | 'price-high' | 'name';
-
-const sortOptions: [Sort, string][] = [
-  ['featured', 'Featured'],
-  ['price-low', 'Price: low to high'],
-  ['price-high', 'Price: high to low'],
-  ['name', 'Name: A to Z'],
+// After the syringes, every other category gets a panel, four to a row as on a marketplace home page.
+const PANEL_ROWS: Category[][] = [
+  ['IV Cannula', 'IV Sets', 'Gloves', 'Face Masks'],
+  ['Caps & Shoe Covers', 'Bandages & Gauze', 'Lab Disposables'],
 ];
 
-// 'featured' lists the categories in the store's order (syringes first), each in catalogue order (sort is stable).
-const compareBy: Record<Sort, (a: Product, b: Product) => number> = {
-  featured: (a: Product, b: Product) => categories.indexOf(a.category) - categories.indexOf(b.category),
-  'price-low': (a: Product, b: Product) => a.price - b.price,
-  'price-high': (a: Product, b: Product) => b.price - a.price,
-  name: (a: Product, b: Product) => a.name.localeCompare(b.name),
-};
-
-// Who the client supplies and what they promise, from their posters.
-const buyers: [LucideIcon, string][] = [
-  [Landmark, 'Government hospitals'],
-  [Hospital, 'Local hospitals'],
-  [Stethoscope, 'Clinics and health centres'],
-  [Building2, 'Institutions and organisations'],
-];
-
-const supplies = ['Syringes', 'Needles', 'IV sets', 'Face masks', 'Gloves', 'Bandages', 'Gauze and cotton', 'Surgical items'];
-
+// What the client promises, from their posters.
 const promises: [LucideIcon, string, string][] = [
   [BadgeCheck, 'High quality products', 'Sterile, sealed and single-use, as medical disposables should be.'],
   [ShieldCheck, 'Hygienic and safe', 'Stored and packed with care, so every box reaches you clean.'],
@@ -49,274 +25,227 @@ const promises: [LucideIcon, string, string][] = [
   [Headset, 'Customer support', 'Call or WhatsApp us about sizes, stock and bulk rates.'],
 ];
 
+const viewAllClass = 'inline-flex shrink-0 items-center gap-1 rounded-full bg-brand px-4 py-2 text-sm font-bold text-white transition hover:bg-brand-dark';
+
+const lowestPrice = (group: ProductGroup): number => Math.min(...group.map((product: Product) => product.price));
+const bestDiscount = (group: ProductGroup): number => Math.max(...group.map(discountOf));
+
 type HomePageProps = ShopActions & {
   products: Product[] | null; // null while the catalogue loads from the API
   catalogueError: string;
   reloadProducts: () => void;
-  search: string;
-  setSearch: (search: string) => void;
 };
 
-export function HomePage({ products, catalogueError, reloadProducts, search, setSearch, ...shop }: HomePageProps) {
-  const [activeCategory, setActiveCategory] = useState<Category | typeof ALL_PRODUCTS>(ALL_PRODUCTS);
-  const [sort, setSort] = useState<Sort>('featured');
-  const query = search.trim().toLowerCase();
-  const filtering = query !== '' || activeCategory !== ALL_PRODUCTS;
-  usePageTitle();
-  const filteredProducts = useMemo(
-    () =>
-      (products ?? [])
-        .filter(
-          (product: Product) =>
-            (activeCategory === ALL_PRODUCTS || product.category === activeCategory) &&
-            [product.name, product.category, product.description].some((text: string) => text.toLowerCase().includes(query)),
-        )
-        .sort(compareBy[sort]),
-    [products, activeCategory, query, sort],
-  );
-  const syringeRange = useMemo(() => (products ?? []).filter((product: Product) => SYRINGE_RANGE.includes(product.category)).sort(compareBy.featured), [products]);
-
-  const showAllProducts = (): void => {
-    setActiveCategory(ALL_PRODUCTS);
-    setSearch('');
+// A category's best on one panel: up to three products as tiles (or one large tile), then "See all".
+function CategoryPanel({ category, groups }: { category: Category; groups: ProductGroup[] }) {
+  const tile = (group: ProductGroup, large: boolean) => {
+    const first = group[0];
+    const off = bestDiscount(group);
+    return (
+      <Link to={`/product/${first.id}`} className="group block">
+        <img src={first.image} alt="" loading="lazy" className={`w-full rounded object-cover ${large ? 'aspect-[4/3]' : 'aspect-square'}`} />
+        <p className={`mt-1.5 line-clamp-2 text-slate-700 group-hover:text-brand ${large ? 'text-sm' : 'text-xs'}`}>{group.length > 1 ? groupName(first) : first.name}</p>
+        <p className={large ? 'text-sm' : 'text-xs'}>
+          <span className="font-bold text-slate-900">
+            {group.length > 1 ? 'From ' : ''}
+            {formatPrice(lowestPrice(group))}
+          </span>
+          {off > 0 && <span className="ml-1.5 font-bold text-deal">{group.length > 1 ? `Up to ${off}% off` : `${off}% off`}</span>}
+        </p>
+        {large && group.length > 1 && <p className="text-xs text-slate-500">{variantSummary(group)}</p>}
+      </Link>
+    );
   };
+  return (
+    <section className={`${panel} flex flex-col p-4`}>
+      <h2 className="text-lg font-bold text-slate-900">{category}</h2>
+      {groups.length === 1 ? (
+        <div className="mt-3 flex-1">{tile(groups[0], true)}</div>
+      ) : (
+        <ul className="mt-3 grid flex-1 grid-cols-2 content-start gap-3">
+          {groups.slice(0, 3).map((group: ProductGroup) => (
+            <li key={group[0].id}>{tile(group, false)}</li>
+          ))}
+          <li>
+            <Link to={categoryPath(category)} className="flex aspect-square flex-col items-center justify-center gap-1 rounded bg-brand-soft text-center text-xs font-bold text-brand transition hover:bg-brand hover:text-white">
+              <ChevronRight size={22} /> See all
+            </Link>
+          </li>
+        </ul>
+      )}
+      <Link to={categoryPath(category)} className="mt-4 text-sm font-medium text-brand hover:underline">
+        See more
+      </Link>
+    </section>
+  );
+}
 
-  const catalogueStatus = catalogueError ? <LoadError message={catalogueError} retry={reloadProducts} /> : <Loading label="Loading products…" />;
+export function HomePage({ products, catalogueError, reloadProducts, ...shop }: HomePageProps) {
+  usePageTitle();
+  const groups = groupByFamily([...(products ?? [])].sort(byCategory));
+  const groupsIn = (category: Category): ProductGroup[] => groups.filter((group: ProductGroup) => group[0].category === category);
 
   return (
-    <main>
-      <section className="border-b border-slate-200 bg-white">
-        <div className="mx-auto grid max-w-7xl items-center gap-10 px-5 py-12 lg:grid-cols-2 lg:gap-14 lg:px-8 lg:py-16">
-          <div>
-            <p className="text-sm font-semibold text-leaf">Medical disposables wholesaler · New Delhi</p>
-            <h1 className="mt-4 text-4xl font-semibold leading-tight tracking-tight text-navy sm:text-5xl">Disposable syringes for hospitals, clinics and government supply</h1>
-            <p className="mt-5 max-w-xl text-lg leading-8 text-slate-600">
-              Sterile, single-use syringes from 0.5 ml to 50 ml, insulin syringes and needles, along with masks, gloves and dressings. Buy by the box here, or ask us for a
-              bulk rate.
-            </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link to="/#syringes" className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-6 py-3.5 font-semibold text-white transition hover:bg-brand-dark">
-                See syringe range <ArrowRight size={18} />
+    <main className="mx-auto max-w-[1400px] space-y-3 px-2 py-3 sm:px-4">
+      <section aria-label="Shop by category" className={`${panel} px-1 py-3 sm:px-3`}>
+        <ul className="flex gap-1 overflow-x-auto scrollbar-none lg:justify-between">
+          {categories.map((category) => (
+            <li key={category} className="shrink-0">
+              <Link to={categoryPath(category)} className="group flex w-[5.25rem] flex-col items-center gap-2 rounded-md p-1 text-center sm:w-28">
+                <img src={categoryImages[category]} alt="" className="h-16 w-16 rounded-full border border-slate-200 object-cover transition group-hover:scale-105 sm:h-20 sm:w-20" />
+                <span className="text-xs font-medium leading-tight text-slate-800 group-hover:text-brand sm:text-sm">{category}</span>
               </Link>
-              <a
-                href={whatsAppLink(BULK_MESSAGE)}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 px-6 py-3.5 font-semibold text-navy transition hover:border-navy"
-              >
-                <WhatsAppIcon size={19} className="text-whatsapp" /> Get a bulk rate
-              </a>
-            </div>
-            <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm font-medium text-slate-600">
-              {['Sterile, single-use', 'Wholesale and retail', 'Government and local supply'].map((point: string) => (
-                <li key={point} className="flex items-center gap-2">
-                  <Check size={16} className="text-leaf" /> {point}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <img
-            className="h-72 w-full rounded-xl object-cover sm:h-96 lg:h-[440px]"
-            src="https://images.pexels.com/photos/7722555/pexels-photo-7722555.jpeg?auto=compress&cs=tinysrgb&w=1200"
-            alt="Sterile disposable syringes in sealed packs"
-          />
-        </div>
-      </section>
-
-      <section id="syringes" className="mx-auto max-w-7xl scroll-mt-32 px-5 py-14 md:scroll-mt-16 lg:px-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-2xl font-semibold text-navy sm:text-3xl">Syringes and needles</h2>
-            <p className="mt-2 max-w-2xl text-slate-600">Sterile and individually packed, sold by the box. Prices include taxes; for larger quantities, ask us for a bulk rate.</p>
-          </div>
-          <a href={whatsAppLink(BULK_MESSAGE)} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-brand hover:underline">
-            <WhatsAppIcon size={16} className="text-whatsapp" /> Ask for a bulk rate
-          </a>
-        </div>
-        {!products ? (
-          <div className="mt-8">{catalogueStatus}</div>
-        ) : (
-          <div className="mt-8 overflow-hidden rounded-xl border border-slate-200 bg-white">
-            <div aria-hidden="true" className="hidden grid-cols-[3.5rem_1fr_8rem_6rem_8.5rem] gap-x-5 border-b border-slate-200 bg-slate-50 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 sm:grid">
-              <span className="col-span-2">Product</span>
-              <span>Pack</span>
-              <span>Price</span>
-            </div>
-            <ul className="divide-y divide-slate-100">
-              {syringeRange.map((product: Product) => (
-                <li key={product.id} className="grid grid-cols-[3.5rem_1fr] items-center gap-x-4 px-4 py-3 sm:grid-cols-[3.5rem_1fr_8rem_6rem_8.5rem] sm:gap-x-5 sm:px-5">
-                  <img src={product.image} alt="" loading="lazy" className="h-14 w-14 rounded-lg object-cover" />
-                  <div className="min-w-0">
-                    <Link to={`/product/${product.id}`} className="font-semibold leading-snug text-navy transition hover:text-brand">
-                      {product.name}
-                    </Link>
-                    {product.badge && <span className="ml-2 inline-block rounded bg-leaf-soft px-1.5 py-0.5 align-middle text-[11px] font-semibold text-leaf">{product.badge}</span>}
-                    <p className="mt-0.5 text-sm text-slate-500 sm:hidden">
-                      {product.unit} · <span className="font-semibold text-navy">{formatPrice(product.price)}</span>
-                    </p>
-                    <StockNote stock={product.stock} className="mt-0.5" />
-                  </div>
-                  <p className="hidden text-sm text-slate-600 sm:block">{product.unit}</p>
-                  <p className="hidden font-semibold text-navy sm:block">{formatPrice(product.price)}</p>
-                  <div className="col-start-2 mt-2 sm:col-start-auto sm:mt-0 sm:justify-self-end">
-                    <AddToCart product={product} {...shop} />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </section>
-
-      <section id="products" className="scroll-mt-32 border-y border-slate-200 bg-white py-14 md:scroll-mt-16">
-        <div className="mx-auto max-w-7xl px-5 lg:px-8">
-          <h2 className="text-2xl font-semibold text-navy sm:text-3xl">All products</h2>
-          <p className="mt-2 text-slate-600">Everything we stock, from syringes and needles to masks, gloves and dressings.</p>
-          <div className="mb-8 mt-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex flex-wrap gap-2 text-sm font-semibold">
-              {[ALL_PRODUCTS, ...categories].map((category) => (
-                <button
-                  key={category}
-                  onClick={() => setActiveCategory(category)}
-                  aria-pressed={activeCategory === category}
-                  className={`whitespace-nowrap rounded-lg border px-4 py-2 transition ${activeCategory === category ? 'border-navy bg-navy text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-navy hover:text-navy'}`}
-                >
-                  {category}
-                </button>
-              ))}
-            </div>
-            <label className="flex shrink-0 items-center gap-2 text-sm font-semibold text-slate-500">
-              Sort by
-              <select
-                value={sort}
-                onChange={(event: ChangeEvent<HTMLSelectElement>) => setSort(event.target.value as Sort)}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-semibold text-navy outline-none transition focus:border-brand"
-              >
-                {sortOptions.map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          {filtering && products && (
-            <p className="-mt-3 mb-6 text-sm font-semibold text-slate-500">
-              Showing {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
-              {activeCategory !== ALL_PRODUCTS && (
-                <>
-                  {' '}in <strong className="text-navy">{activeCategory}</strong>
-                </>
-              )}
-              {query && (
-                <>
-                  {' '}for “<strong className="text-navy">{search.trim()}</strong>”
-                </>
-              )}
-              <button onClick={showAllProducts} className="-my-1 ml-3 py-1 font-semibold text-brand hover:underline">
-                Clear filters
-              </button>
-            </p>
-          )}
-          {!products ? (
-            catalogueStatus
-          ) : filteredProducts.length > 0 ? (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {filteredProducts.map((product: Product) => (
-                <ProductCard key={product.id} product={product} {...shop} />
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-xl border border-slate-200 p-12 text-center text-slate-500">
-              <p>No products match your search. Try another term or category.</p>
-              <button onClick={showAllProducts} className="mt-5 rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark">
-                Show all products
-              </button>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-5 py-14 lg:px-8">
-        <div className="grid items-center gap-10 lg:grid-cols-2">
-          <div>
-            <h2 className="text-2xl font-semibold text-navy sm:text-3xl">Government and local supply</h2>
-            <p className="mt-3 max-w-xl leading-7 text-slate-600">
-              We supply all types of medical disposables to government hospitals and institutions. Local supply to hospitals, clinics and health centres is also available.
-            </p>
-            <ul className="mt-6 grid gap-3 sm:grid-cols-2">
-              {buyers.map(([Icon, label]) => (
-                <li key={label} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-navy">
-                  <Icon size={20} className="shrink-0 text-brand" /> {label}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-6 sm:p-8">
-            <h3 className="font-semibold text-navy">We supply all types of medical disposables</h3>
-            <ul className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 text-sm text-slate-700">
-              {supplies.map((supply: string) => (
-                <li key={supply} className="flex items-center gap-2.5">
-                  <Check size={16} className="shrink-0 text-leaf" /> {supply}
-                </li>
-              ))}
-            </ul>
-            <a href={whatsAppLink()} target="_blank" rel="noreferrer" className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-brand hover:underline">
-              <WhatsAppIcon size={16} className="text-whatsapp" /> Ask about a product
-            </a>
-          </div>
-        </div>
-        <ul className="mt-12 grid gap-6 border-t border-slate-200 pt-10 sm:grid-cols-2 lg:grid-cols-4">
-          {promises.map(([Icon, title, text]) => (
-            <li key={title} className="flex gap-4">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand">
-                <Icon size={21} />
-              </span>
-              <div>
-                <h3 className="font-semibold text-navy">{title}</h3>
-                <p className="mt-1 text-sm leading-6 text-slate-600">{text}</p>
-              </div>
             </li>
           ))}
         </ul>
       </section>
 
-      <section id="contact" className="scroll-mt-32 bg-navy md:scroll-mt-16">
-        <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 lg:grid-cols-[1.4fr_1fr] lg:items-center lg:px-8">
-          <div>
-            <h2 className="text-2xl font-semibold text-white sm:text-3xl">Buying in bulk?</h2>
-            <p className="mt-3 max-w-xl leading-7 text-blue-100">
-              Send us the sizes and quantities you need on WhatsApp, or call us. We will share a quotation for your hospital, clinic or institution.
-            </p>
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-              <a
-                href={whatsAppLink(BULK_MESSAGE)}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-6 py-3.5 font-semibold text-navy transition hover:bg-brand-soft"
-              >
-                <WhatsAppIcon size={19} className="text-whatsapp" /> WhatsApp for a quote
-              </a>
-              <a href={PHONE_LINK} className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/30 px-6 py-3.5 font-semibold text-white transition hover:bg-white/10">
-                <Phone size={18} /> Call {PHONE}
-              </a>
+      {!products ? (
+        <div className={panel}>{catalogueError ? <LoadError message={catalogueError} retry={reloadProducts} /> : <Loading label="Loading products…" />}</div>
+      ) : (
+        <>
+          <section className={panel}>
+            <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-4 py-3">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 sm:text-xl">Disposable syringes</h2>
+                <p className="text-sm text-slate-500">Our main line. Sterile and single-use, without needle or with needle fitted.</p>
+              </div>
+              <Link to={categoryPath('Syringes')} className={viewAllClass}>
+                View all <ChevronRight size={16} />
+              </Link>
             </div>
+            <div className="grid gap-3 p-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)]">
+              <div className="flex gap-3 overflow-x-auto scrollbar-none sm:grid sm:grid-cols-3 sm:overflow-visible lg:order-last">
+                {groupsIn('Syringes').map((group: ProductGroup) => (
+                  <div key={group[0].id} className="w-[46%] shrink-0 sm:w-auto">
+                    <ProductCard group={group} {...shop} />
+                  </div>
+                ))}
+              </div>
+              <aside className="relative flex min-h-56 flex-col justify-end overflow-hidden rounded-md bg-navy p-5 text-white">
+                <img src="/photos/coloured-syringes.jpg" alt="" className="absolute inset-0 h-full w-full object-cover opacity-40" />
+                <div className="absolute inset-0 bg-gradient-to-t from-navy via-navy/70 to-transparent" />
+                <div className="relative">
+                  <p className="text-xs font-bold uppercase tracking-widest text-cart">Bulk rates</p>
+                  <p className="mt-1 text-xl font-bold leading-snug">Syringes for hospitals and clinics, by the carton</p>
+                  <p className="mt-2 text-sm text-blue-100">Tell us the sizes and quantities and we will send a quotation.</p>
+                  <a
+                    href={whatsAppLink(BULK_MESSAGE)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-bold text-navy transition hover:bg-brand-soft"
+                  >
+                    <WhatsAppIcon size={17} className="text-whatsapp" /> Get a bulk rate
+                  </a>
+                </div>
+              </aside>
+            </div>
+          </section>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {PANEL_ROWS[0].map((category: Category) => (
+              <CategoryPanel key={category} category={category} groups={groupsIn(category)} />
+            ))}
           </div>
-          <address className="rounded-xl border border-white/15 bg-white/5 p-6 not-italic text-blue-100">
-            <p className="font-display text-lg font-semibold text-white">YourEcom</p>
-            <p className="text-sm">Medical disposable wholesaler</p>
-            <p className="mt-4 flex gap-3">
-              <MapPin size={18} className="mt-0.5 shrink-0 text-blue-300" />
-              <span>
-                {ADDRESS[0]}
-                <br />
-                {ADDRESS[1]}
+
+          <section className="relative overflow-hidden rounded-md bg-navy text-white">
+            <img src="/photos/warehouse-stock.jpg" alt="" className="absolute inset-y-0 right-0 hidden h-full w-1/2 object-cover sm:block [mask-image:linear-gradient(to_right,transparent,black_45%)]" />
+            <div className="relative max-w-xl px-5 py-7 sm:px-8 sm:py-9">
+              <p className="text-xs font-bold uppercase tracking-widest text-cart">Wholesale · Retail · Government supply · Local supply</p>
+              <h2 className="mt-2 text-2xl font-bold leading-snug sm:text-3xl">Supplies for government hospitals, clinics and institutions</h2>
+              <p className="mt-2 text-blue-100">Send us your list for a quotation, or call us. Local supply to hospitals, clinics and health centres too.</p>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <a
+                  href={whatsAppLink(QUOTE_MESSAGE)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 rounded-full bg-cart px-5 py-2.5 text-sm font-bold text-slate-900 transition hover:bg-cart-dark"
+                >
+                  <WhatsAppIcon size={17} /> WhatsApp for a quote
+                </a>
+                <a href={PHONE_LINK} className="inline-flex items-center gap-2 rounded-full border border-white/40 px-5 py-2.5 text-sm font-bold transition hover:bg-white/10">
+                  <Phone size={16} /> {PHONE}
+                </a>
+              </div>
+            </div>
+          </section>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {PANEL_ROWS[1].map((category: Category) => (
+              <CategoryPanel key={category} category={category} groups={groupsIn(category)} />
+            ))}
+            <section className={`${panel} flex flex-col p-4`}>
+              <h2 className="text-lg font-bold text-slate-900">Hospital PPE in one order</h2>
+              <img src="/photos/ppe-kit.jpg" alt="Shoe covers, bouffant caps, surgeon caps and 3-ply masks" loading="lazy" className="mt-3 aspect-[4/3] w-full rounded object-cover" />
+              <p className="mt-2 text-sm text-slate-600">Masks, caps and shoe covers for wards and theatres, packed by the hundred.</p>
+              <Link to={categoryPath('Caps & Shoe Covers')} className="mt-auto pt-3 text-sm font-medium text-brand hover:underline">
+                Shop caps and shoe covers
+              </Link>
+            </section>
+          </div>
+
+          <section className={panel}>
+            <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-4 py-3">
+              <h2 className="text-lg font-bold text-slate-900 sm:text-xl">All products</h2>
+              <Link to="/products" className={viewAllClass}>
+                View all <ChevronRight size={16} />
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-2 p-2 sm:grid-cols-3 sm:gap-3 sm:p-3 lg:grid-cols-4 xl:grid-cols-5">
+              {groups.map((group: ProductGroup) => (
+                <ProductCard key={group[0].id} group={group} {...shop} />
+              ))}
+            </div>
+          </section>
+        </>
+      )}
+
+      <section id="contact" className={`${panel} scroll-mt-32`}>
+        <ul className="grid gap-6 border-b border-slate-100 p-5 sm:grid-cols-2 lg:grid-cols-4">
+          {promises.map(([Icon, title, text]) => (
+            <li key={title} className="flex gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
+                <Icon size={21} />
               </span>
-            </p>
-            <a href={MAP_LINK} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-white hover:underline">
-              Get directions <ArrowRight size={15} />
+              <div>
+                <h3 className="font-bold text-slate-900">{title}</h3>
+                <p className="mt-0.5 text-sm leading-6 text-slate-600">{text}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+        <div className="grid gap-5 p-5 md:grid-cols-[1fr_auto] md:items-center">
+          <address className="grid gap-2 text-sm not-italic text-slate-700 sm:grid-cols-3 sm:gap-5">
+            <a href={MAP_LINK} target="_blank" rel="noreferrer" className="flex gap-2.5 hover:text-brand">
+              <MapPin size={18} className="mt-0.5 shrink-0 text-brand" />
+              <span>
+                <strong className="block text-slate-900">YourEcom, Medical Disposable Wholesaler</strong>
+                {ADDRESS[0]}, {ADDRESS[1]}
+              </span>
+            </a>
+            <a href={PHONE_LINK} className="flex gap-2.5 hover:text-brand">
+              <Phone size={18} className="mt-0.5 shrink-0 text-brand" />
+              <span>
+                <strong className="block text-slate-900">Call / WhatsApp</strong>
+                {PHONE}
+              </span>
+            </a>
+            <a href={`mailto:${EMAIL}`} className="flex gap-2.5 hover:text-brand">
+              <Mail size={18} className="mt-0.5 shrink-0 text-brand" />
+              <span>
+                <strong className="block text-slate-900">Email</strong>
+                {EMAIL}
+              </span>
             </a>
           </address>
+          <a
+            href={whatsAppLink(QUOTE_MESSAGE)}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-whatsapp px-5 py-3 text-sm font-bold text-white transition hover:brightness-95"
+          >
+            <WhatsAppIcon size={18} /> Bulk order enquiry
+          </a>
         </div>
       </section>
     </main>

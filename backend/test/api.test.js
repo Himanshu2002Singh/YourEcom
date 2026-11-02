@@ -106,26 +106,29 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
     assert.ok(Number.isInteger(stock) && stock >= 0, `stock ${stock} should be a count`);
     assert.deepEqual(first, {
       id: 1,
-      name: '3-Ply Protective Face Masks',
+      name: '3-Ply Surgical Face Mask, ISI Marked',
       category: 'Face Masks',
       price: 249,
+      mrp: 450,
       unit: 'Box of 50',
-      badge: 'Best seller',
-      image: 'https://images.pexels.com/photos/9502813/pexels-photo-9502813.jpeg?auto=compress&cs=tinysrgb&w=1000',
-      description: 'Comfortable, breathable and dependable protection for everyday use in clinics, hospitals and at home.',
-      features: ['3-layer filtration', 'Soft elastic ear loops', 'Non-woven breathable fabric'],
+      badge: 'ISI marked',
+      image: '/photos/mask-isi-class2.jpg',
+      gallery: ['/photos/mask-isi-class1.jpg', '/photos/kit-isi-mask.jpg'],
+      description: 'ISI-marked 3-ply surgical masks made to IS 16289:2014, with a soft inner layer, a filter layer and a fluid-resistant outer layer.',
+      features: ['ISI marked, IS 16289:2014', '3-layer protection', 'Nose wire for a close fit'],
     });
-    assert.equal('badge' in products[2], false, 'a product without a badge has no badge key');
+    assert.equal('badge' in products[3], false, 'a product without a badge has no badge key');
+    assert.deepEqual([products[2].family, products[2].variant], ['Disposable Syringe without Needle', '2 ml'], 'a size names its family and variant');
 
     const ids = async path => (await call(path)).body.products.map(product => product.id);
-    assert.deepEqual(await ids('/products?category=Gloves'), [2]);
-    assert.deepEqual(await ids(`/products?category=${encodeURIComponent('Gauze & Cotton')}`), [5]);
-    assert.deepEqual(await ids('/products?category=Needles'), [14]);
-    assert.deepEqual(await ids('/products?q=INSULIN'), [12]);
-    assert.deepEqual(await ids('/products?q=cotton&category=Bandages'), []);
+    assert.deepEqual(await ids('/products?category=Gloves'), [2, 25, 26]);
+    assert.deepEqual(await ids(`/products?category=${encodeURIComponent('Bandages & Gauze')}`), [5, 6]);
+    assert.deepEqual(await ids(`/products?category=${encodeURIComponent('IV Cannula')}`), [17, 18, 19, 20, 21]);
+    assert.deepEqual(await ids('/products?q=SCALP'), [22, 23, 24]);
+    assert.deepEqual(await ids('/products?q=cotton&category=Gloves'), []);
     assert.deepEqual(await ids('/products?q=%25'), [], '% is matched as itself, not as a wildcard');
 
-    assert.equal((await call('/products/2')).body.product.name, 'Nitrile Examination Gloves');
+    assert.equal((await call('/products/2')).body.product.name, 'Nitrile Examination Gloves, Blue');
     assert.equal((await call('/products/999')).status, 404);
     assert.equal((await call('/products/abc')).status, 404);
   });
@@ -188,7 +191,7 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
     assert.ok(Math.abs(Date.parse(placedAt) - Date.now()) < 60_000, `placedAt ${placedAt} should be now`);
     assert.deepEqual(order, {
       email,
-      items: [{ id: 4, name: 'IV Administration Set', price: 899, unit: 'Pack of 25', image, quantity: 1 }],
+      items: [{ id: 4, name: 'IV Infusion Set', price: 899, unit: 'Pack of 10', image, quantity: 1 }],
       subtotal: 899,
       discount: 0,
       couponCode: null,
@@ -259,10 +262,10 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
   test('nobody can order more than is in stock', async () => {
     await query('UPDATE products SET stock = 1 WHERE id = 3');
     const order = quantity => call('/orders', { method: 'POST', cookie, body: { items: [{ id: 3, quantity }], delivery, paymentMethod: 'cod' } });
-    assert.deepEqual(await order(2), { status: 409, body: { error: 'Only 1 left of 2 ml Disposable Syringe with Needle. Lower the quantity and try again.' }, cookie: undefined });
+    assert.deepEqual(await order(2), { status: 409, body: { error: 'Only 1 left of Disposable Syringe without Needle, 2 ml. Lower the quantity and try again.' }, cookie: undefined });
     assert.equal((await order(1)).status, 201);
     assert.equal((await call('/products/3')).body.product.stock, 0);
-    assert.equal((await order(1)).body.error, '2 ml Disposable Syringe with Needle is out of stock. Remove it from your cart to order the rest.');
+    assert.equal((await order(1)).body.error, 'Disposable Syringe without Needle, 2 ml is out of stock. Remove it from your cart to order the rest.');
   });
 
   test('only customers who ordered a product can review it, once each', async () => {

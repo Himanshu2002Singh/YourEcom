@@ -21,14 +21,14 @@ export function WishlistPage({ products, ...shop }: WishlistPageProps) {
           <Heart size={32} className="mx-auto text-rose-500" />
           <h2 className="mt-4 text-xl font-semibold text-navy">Nothing saved yet</h2>
           <p className="mt-2 text-sm text-slate-500">Tap the heart on any product to keep it here.</p>
-          <Link to="/#products" className="mt-5 inline-flex rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-navy">
+          <Link to="/products" className="mt-5 inline-flex rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-navy">
             Browse products
           </Link>
         </div>
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {products.map((product: Product) => (
-            <ProductCard key={product.id} product={product} {...shop} />
+            <ProductCard key={product.id} group={[product]} {...shop} />
           ))}
         </div>
       )}

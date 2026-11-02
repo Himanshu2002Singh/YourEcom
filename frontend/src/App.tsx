@@ -2,7 +2,8 @@ import { startTransition, useCallback, useEffect, useRef, useState, type ReactEl
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { Check, CircleAlert } from 'lucide-react';
 import { CartDrawer } from '@/components/CartDrawer';
-import { Footer, Header, LoadError, Loading, WhatsAppButton } from '@/components/StoreShared';
+import { Footer, Header, WhatsAppButton } from '@/components/Layout';
+import { LoadError, Loading } from '@/components/StoreShared';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useScrollRestoration } from '@/hooks/useScrollRestoration';
 import { ApiError, NO_API, api } from '@/lib/api';
@@ -16,6 +17,7 @@ import { OrdersPage } from '@/pages/OrdersPage';
 import { ForgotPasswordPage, ResetPasswordPage } from '@/pages/PasswordResetPages';
 import { PolicyPage } from '@/pages/PolicyPage';
 import { ProductPage } from '@/pages/ProductPage';
+import { ProductsPage } from '@/pages/ProductsPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { WishlistPage } from '@/pages/WishlistPage';
 import type { CartItem, CartLine, DeliveryDetails, Order, OrderItem, PaymentMethod, Product, User } from '@/types/store';
@@ -38,7 +40,6 @@ function App() {
   const [orders, setOrders] = useState<Order[] | null>(null); // null until the customer's orders load
   const [wishlist, setWishlist] = useState<number[] | null>(null); // saved product ids; null until they load
   const [cartOpen, setCartOpen] = useState(false);
-  const [search, setSearch] = useState('');
   const [notice, setNotice] = useState<Notice | null>(null);
   const noticeTimer = useRef<number>();
   useScrollRestoration();
@@ -260,13 +261,14 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800">
-      <Header cartCount={cartCount} wishlistCount={wishlist?.length ?? 0} openCart={openCart} search={search} setSearch={setSearch} user={user ?? null} />
+    <div className="min-h-screen bg-canvas text-slate-800">
+      <Header cartCount={cartCount} wishlistCount={wishlist?.length ?? 0} openCart={openCart} user={user ?? null} products={products} />
       <Routes>
         <Route
           path="/"
-          element={<HomePage {...shopActions} products={products} catalogueError={catalogueError} reloadProducts={loadProducts} search={search} setSearch={setSearch} />}
+          element={<HomePage {...shopActions} products={products} catalogueError={catalogueError} reloadProducts={loadProducts} />}
         />
+        <Route path="/products" element={withProducts((catalogue: Product[]) => <ProductsPage {...shopActions} products={catalogue} />)} />
         <Route
           path="/product/:id"
           element={withProducts((catalogue: Product[]) => (

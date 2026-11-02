@@ -32,7 +32,7 @@ export function OrdersPage({ orders, buyAgain, cancelOrder }: OrdersPageProps) {
           <h1 className="mt-2 text-4xl font-semibold text-navy">My orders</h1>
           <p className="mt-2 text-slate-500">Keep an eye on every essential headed your way.</p>
         </div>
-        <Link to="/#products" className="flex items-center gap-2 self-start rounded-lg bg-brand px-5 py-3 text-sm font-semibold text-white transition hover:bg-navy">
+        <Link to="/products" className="flex items-center gap-2 self-start rounded-lg bg-brand px-5 py-3 text-sm font-semibold text-white transition hover:bg-navy">
           <ShoppingBag size={16} /> Shop again
         </Link>
       </div>

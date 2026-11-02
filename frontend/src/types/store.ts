@@ -6,11 +6,15 @@ export type Product = {
   id: number;
   name: string;
   category: Category;
+  family?: string; // the name shared by every size of the product, e.g. 'Disposable Syringe without Needle'
+  variant?: string; // this size within its family, e.g. '2 ml'
   price: number;
+  mrp: number | null; // the printed MRP, shown struck through beside the price
   unit: string;
   stock: number; // how many can still be ordered
   badge?: string;
   image: string;
+  gallery: string[]; // more photos after `image`
   description: string;
   features: string[];
   rating: number | null; // average stars, null before the first review

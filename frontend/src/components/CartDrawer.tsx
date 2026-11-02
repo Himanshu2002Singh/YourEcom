@@ -136,7 +136,7 @@ export function CartDrawer({ open, cart, cartCount, cartTotal, setOpen, setQuant
                 <span>{formatPrice(cartTotal + deliveryFee)}</span>
               </div>
             </div>
-            <button onClick={checkout} className="mt-5 w-full rounded-lg bg-brand py-4 font-semibold text-white transition hover:bg-navy">
+            <button onClick={checkout} className="mt-5 w-full rounded-full bg-buy py-3.5 font-bold text-slate-900 shadow-sm transition hover:bg-buy-dark">
               Continue to checkout
             </button>
             <p className="mt-3 text-center text-xs font-semibold text-slate-400">Have a coupon? Apply it at checkout.</p>

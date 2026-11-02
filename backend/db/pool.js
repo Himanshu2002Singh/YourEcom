@@ -21,9 +21,9 @@ export function db() {
   return pool;
 }
 
-// Creates any missing tables (and the seeded products) the first time this process touches the
-// database (after a start, restart or deploy). SCHEMA only adds what's missing, so running it
-// again changes nothing. If it fails, the next query tries again.
+// Creates any missing tables and writes the catalogue (db/schema.js) the first time this process touches the
+// database (after a start, restart or deploy). SCHEMA only adds what's missing and rewrites the
+// same catalogue, so running it again changes nothing. If it fails, the next query tries again.
 export function ensureTables() {
   tablesReady ??= (async () => {
     const connection = await mysql.createConnection({ uri: databaseUrl(), multipleStatements: true });

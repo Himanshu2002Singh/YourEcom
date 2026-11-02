@@ -78,7 +78,7 @@ export function LoginPage({ user, signIn }: LoginPageProps) {
           <div className="flex h-full flex-col justify-between">
             <div>
               <p className="text-sm font-semibold text-blue-200">Your YourEcom account</p>
-              <p className="mt-4 font-display text-4xl font-semibold leading-tight text-white">Order syringes and medical disposables in a few clicks.</p>
+              <p className="mt-4 text-4xl font-semibold leading-tight text-white">Order syringes and medical disposables in a few clicks.</p>
               <p className="mt-6 max-w-sm leading-7 text-blue-100">Save your delivery details, track your orders and reorder the supplies your hospital, clinic or store uses most.</p>
             </div>
             <div className="flex items-center gap-3 text-sm font-semibold text-white">

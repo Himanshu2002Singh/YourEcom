@@ -136,7 +136,7 @@ export function CheckoutPage({ cart, cartTotal, user, savedDelivery, setQuantity
 
   return (
     <main className="mx-auto max-w-7xl px-5 py-10 lg:px-8">
-      <Link to="/#products" className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-brand">
+      <Link to="/products" className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-brand">
         <ArrowLeft size={17} /> Continue shopping
       </Link>
       <CheckoutSteps step={step} />
@@ -332,7 +332,7 @@ function OrderConfirmation({ order }: { order: Order }) {
           <Link to={`/orders/${order.id}`} className="rounded-lg bg-brand px-7 py-4 font-semibold text-white transition hover:bg-navy">
             View order details
           </Link>
-          <Link to="/#products" className="rounded-lg border-2 border-slate-200 px-7 py-4 font-semibold text-navy transition hover:border-brand hover:text-brand">
+          <Link to="/products" className="rounded-lg border-2 border-slate-200 px-7 py-4 font-semibold text-navy transition hover:border-brand hover:text-brand">
             Continue shopping
           </Link>
         </div>
@@ -349,7 +349,7 @@ function EmptyCheckout() {
       </div>
       <h1 className="mt-5 text-3xl font-semibold text-navy">Your cart is empty</h1>
       <p className="mt-2 text-slate-500">Add the supplies you need, then come back to check out.</p>
-      <Link to="/#products" className="mt-7 rounded-lg bg-brand px-7 py-4 font-semibold text-white transition hover:bg-navy">
+      <Link to="/products" className="mt-7 rounded-lg bg-brand px-7 py-4 font-semibold text-white transition hover:bg-navy">
         Browse products
       </Link>
     </main>
