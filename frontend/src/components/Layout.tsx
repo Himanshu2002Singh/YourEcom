@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { ChevronRight, Heart, Mail, MapPin, Menu, Package, Phone, Search, ShoppingCart, UserRound, X } from 'lucide-react';
+import { ChevronRight, ExternalLink, Heart, Mail, MapPin, Menu, Package, Phone, Search, ShoppingCart, UserRound, X } from 'lucide-react';
 import { WhatsAppIcon } from '@/components/StoreShared';
 import { categories } from '@/data/categories';
-import { ADDRESS, EMAIL, MAP_LINK, PHONE, PHONE_LINK, whatsAppLink } from '@/data/contact';
+import { ADDRESS, EMAIL, GSTIN, INDIAMART_LINK, MAP_LINK, PHONE, PHONE_LINK, whatsAppLink } from '@/data/contact';
 import { categoryPath, groupByFamily, groupName, matchesSearch, type ProductGroup } from '@/lib/catalogue';
 import type { Product, User } from '@/types/store';
 
@@ -164,6 +164,7 @@ export function Header({ cartCount, wishlistCount, openCart, user, products }: H
     [
       'Help',
       [
+        ['About YourEcom', '/about'],
         ['Shipping and delivery', '/policies/shipping'],
         ['Returns and refunds', '/policies/returns'],
       ],
@@ -209,7 +210,8 @@ export function Header({ cartCount, wishlistCount, openCart, user, products }: H
         </div>
       </header>
       <nav aria-label="Categories" className="bg-brand text-white print:hidden">
-        <div className="mx-auto flex max-w-[1400px] items-center gap-0.5 overflow-x-auto px-1 text-sm scrollbar-none sm:px-3">
+        {/* Below xl the categories don't all fit: the bar scrolls sideways, and its right edge fades to say so. */}
+        <div className="mx-auto flex max-w-[1400px] items-center gap-0.5 overflow-x-auto px-1 text-sm scrollbar-none max-xl:[mask-image:linear-gradient(to_right,black_88%,transparent)] sm:px-3">
           <Link to="/products" className={`whitespace-nowrap rounded px-2.5 py-2 font-bold transition hover:bg-white/15 ${pathname === '/products' && !activeCategory ? 'bg-white/15' : ''}`}>
             All products
           </Link>
@@ -223,14 +225,8 @@ export function Header({ cartCount, wishlistCount, openCart, user, products }: H
               {category}
             </Link>
           ))}
-          <a
-            href={whatsAppLink(BULK_MESSAGE)}
-            target="_blank"
-            rel="noreferrer"
-            className="ml-auto hidden shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-2.5 py-2 font-bold transition hover:bg-white/15 xl:flex"
-          >
-            <WhatsAppIcon size={16} /> Bulk order enquiry
-          </a>
+          {/* An extra stop past the fade, so the last category can scroll fully into view. */}
+          <span aria-hidden="true" className="w-10 shrink-0 xl:hidden" />
         </div>
       </nav>
       {menuOpen && (
@@ -301,6 +297,7 @@ const footerLinks: [string, [string, string][]][] = [
   [
     'Help',
     [
+      ['About YourEcom', '/about'],
       ['Shipping and delivery', '/policies/shipping'],
       ['Returns and refunds', '/policies/returns'],
       ['Privacy policy', '/policies/privacy'],
@@ -343,6 +340,13 @@ export function Footer() {
                 <WhatsAppIcon size={17} /> Chat on WhatsApp
               </a>
             </address>
+            <p className="mt-5 text-xs">
+              GSTIN <span className="font-bold text-white">{GSTIN}</span>
+              <span aria-hidden="true"> · </span>
+              <a href={INDIAMART_LINK} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 transition hover:text-white hover:underline">
+                IndiaMART profile <ExternalLink size={12} />
+              </a>
+            </p>
           </div>
           {footerLinks.map(([title, links]) => (
             <nav key={title} aria-label={title}>
