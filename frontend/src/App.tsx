@@ -8,6 +8,7 @@ import { usePersistentState } from '@/hooks/usePersistentState';
 import { useScrollRestoration } from '@/hooks/useScrollRestoration';
 import { ApiError, NO_API, api } from '@/lib/api';
 import { addToLines, setLineQuantity } from '@/lib/cart';
+import { AboutPage } from '@/pages/AboutPage';
 import { CheckoutPage } from '@/pages/CheckoutPage';
 import { HomePage } from '@/pages/HomePage';
 import { LoginPage } from '@/pages/LoginPage';
@@ -268,6 +269,7 @@ function App() {
           path="/"
           element={<HomePage {...shopActions} products={products} catalogueError={catalogueError} reloadProducts={loadProducts} />}
         />
+        <Route path="/about" element={<AboutPage />} />
         <Route path="/products" element={withProducts((catalogue: Product[]) => <ProductsPage {...shopActions} products={catalogue} />)} />
         <Route
           path="/product/:id"
