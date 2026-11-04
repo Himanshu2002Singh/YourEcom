@@ -17,6 +17,17 @@ export const discountFor = (coupon: Coupon, subtotal: number): number => {
 
 export const formatPrice = (amount: number): string => `₹${amount.toLocaleString('en-IN')}`;
 
+// What one piece of a pack costs, as wholesale buyers compare rates: "₹6/piece" for a 'Box of 100' at ₹600,
+// "₹24/pair" for a 'Box of 50 pairs'. Null when the unit isn't a count of more than one.
+export const perItemPrice = ({ price, unit }: { price: number; unit: string }): string | null => {
+  const match = /\bof (\d+)(?: ([a-z]+?)s?)?$/i.exec(unit);
+  const count = match ? Number(match[1]) : 1;
+  if (!match || count <= 1) return null;
+  const each = price / count;
+  const amount = Number.isInteger(each) ? each.toLocaleString('en-IN') : each.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `₹${amount}/${match[2]?.toLowerCase() ?? 'piece'}`;
+};
+
 // For example "10% off your first order, up to ₹250" or "₹100 off orders of ₹1,000 or more".
 export const describeCoupon = ({ kind, amount, maxDiscount, minSubtotal, firstOrderOnly }: Coupon): string => {
   const off = kind === 'percent' ? `${amount}% off` : `${formatPrice(amount)} off`;

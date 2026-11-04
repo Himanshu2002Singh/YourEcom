@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { Heart, LoaderCircle, ShoppingCart, Star } from 'lucide-react';
 import { QuantityStepper } from '@/components/QuantityStepper';
 import { discountOf, groupName, variantLabel, type ProductGroup } from '@/lib/catalogue';
-import { formatPrice } from '@/lib/pricing';
+import { formatPrice, perItemPrice } from '@/lib/pricing';
 import type { Product } from '@/types/store';
 
 // What product cards and pages can do with the cart and the wishlist (App.tsx keeps both).
@@ -128,7 +128,10 @@ export function ProductCard({ group, isSaved, toggleSaved, ...cart }: ShopAction
       </Link>
       <RatingSummary product={product} className="mt-2" />
       <Price product={product} className="mt-2" />
-      <p className="text-xs text-slate-500">{product.unit}</p>
+      <p className="text-xs text-slate-500">
+        {product.unit}
+        {perItemPrice(product) && <span className="whitespace-nowrap"> · {perItemPrice(product)}</span>}
+      </p>
       <StockNote stock={product.stock} className="mt-1" />
       {group.length > 1 && (
         <label className="mt-2 flex items-center gap-2 text-xs text-slate-500">
