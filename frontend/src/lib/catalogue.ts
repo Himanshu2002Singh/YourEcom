@@ -4,22 +4,33 @@ import type { Category, Product } from '@/types/store';
 // The sizes of one product (a family), or a product that comes in one size, in catalogue order.
 export type ProductGroup = Product[];
 
+// The number a variant starts with ('14G (Orange)' → 14, '12.5 mm × 9 m' → 12.5), or null for 'Blue'.
+const leadingNumber = (variant?: string | null): number | null => {
+  const match = /\d+(\.\d+)?/.exec(variant ?? '');
+  return match ? Number(match[0]) : null;
+};
+
 // Products grouped by family, in the order each family first appears, so the storefront shows one card
-// per product with its sizes to choose from.
+// per product with its sizes to choose from. Sizes run smallest first, whatever order they were added in.
 export const groupByFamily = (products: Product[]): ProductGroup[] => {
   const groups = new Map<string, ProductGroup>();
   for (const product of products) {
     const key = product.family ?? `#${product.id}`;
     groups.set(key, [...(groups.get(key) ?? []), product]);
   }
-  return [...groups.values()];
+  return [...groups.values()].map((group: ProductGroup) =>
+    group.every((product: Product) => leadingNumber(product.variant) !== null)
+      ? [...group].sort((a: Product, b: Product) => (leadingNumber(a.variant) ?? 0) - (leadingNumber(b.variant) ?? 0))
+      : group,
+  );
 };
 
 // A product's name without its size: 'Disposable Syringe without Needle' for any of its sizes.
 export const groupName = (product: Product): string => product.family ?? product.name;
 
-// What the sizes differ by: sizes ('2 ml', '22G') have numbers, other options ('Blue', 'Non-woven') are types.
-export const variantLabel = (group: ProductGroup): string => (group.some((product: Product) => /\d/.test(product.variant ?? '')) ? 'Size' : 'Type');
+// What the sizes differ by: sizes ('2 ml', '22G') have numbers; other options ('Blue', 'Non-woven', 'Class 2') are types.
+export const variantLabel = (group: ProductGroup): string =>
+  group.some((product: Product) => /\d/.test(product.variant ?? '') && !/^class\b/i.test(product.variant ?? '')) ? 'Size' : 'Type';
 
 // "6 sizes: 2 ml – 50 ml" or "2 types: Blue, Black".
 export const variantSummary = (group: ProductGroup): string => {
