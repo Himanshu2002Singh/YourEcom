@@ -106,27 +106,30 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
     assert.ok(Number.isInteger(stock) && stock >= 0, `stock ${stock} should be a count`);
     assert.deepEqual(first, {
       id: 1,
-      name: '3-Ply Surgical Face Mask, ISI Marked',
+      name: 'Magnum 3-Ply Surgical Mask, ISI Marked, Class 2',
       category: 'Face Masks',
-      price: 249,
-      mrp: 450,
+      family: 'Magnum 3-Ply Surgical Mask, ISI Marked',
+      variant: 'Class 2',
+      price: 75,
+      mrp: null,
       unit: 'Box of 50',
       badge: 'ISI marked',
       image: '/photos/mask-isi-class2.jpg',
-      gallery: ['/photos/mask-isi-class1.jpg', '/photos/kit-isi-mask.jpg'],
-      description: 'ISI-marked 3-ply surgical masks made to IS 16289:2014, with a soft inner layer, a filter layer and a fluid-resistant outer layer.',
-      features: ['ISI marked, IS 16289:2014', '3-layer protection', 'Nose wire for a close fit'],
+      gallery: ['/photos/kit-isi-mask.jpg', '/photos/magnum-mask-carton.jpg', '/photos/mask-magnum-1.jpg'],
+      description:
+        'The Magnum Face Mask (Class 1, 2, and 3) is a high-quality 3-ply disposable mask designed for effective protection against airborne particles, dust, and contaminants. These masks provide varying levels of filtration and breathability, ensuring safety and comfort for different environments, from general use to medical and industrial settings.',
+      features: ['ISI marked, IS 16289:2014', 'Ear loops and nose wire', 'Box of 50, carton of 3000'],
     });
     assert.equal('badge' in products[3], false, 'a product without a badge has no badge key');
     assert.deepEqual([products[2].family, products[2].variant], ['Disposable Syringe without Needle', '2 ml'], 'a size names its family and variant');
 
     const ids = async path => (await call(path)).body.products.map(product => product.id);
-    assert.deepEqual(await ids('/products?category=Gloves'), [2, 25, 26]);
-    assert.deepEqual(await ids(`/products?category=${encodeURIComponent('Bandages & Gauze')}`), [5, 6]);
-    assert.deepEqual(await ids(`/products?category=${encodeURIComponent('IV Cannula')}`), [17, 18, 19, 20, 21]);
+    assert.deepEqual(await ids('/products?category=Gloves'), [2, 25, 26, 54, 68]);
+    assert.deepEqual(await ids(`/products?category=${encodeURIComponent('Bandages & Gauze')}`), [5, 6, 39, 40, 41, 42, 43, 44, 45, 67, 69]);
+    assert.deepEqual(await ids(`/products?category=${encodeURIComponent('IV Cannula')}`), [17, 18, 19, 20, 21, 36, 37]);
     assert.deepEqual(await ids('/products?q=SCALP'), [22, 23, 24]);
     assert.deepEqual(await ids('/products?q=cotton&category=Gloves'), []);
-    assert.deepEqual(await ids('/products?q=%25'), [], '% is matched as itself, not as a wildcard');
+    assert.deepEqual(await ids('/products?q=%25%25'), [], '% is matched as itself, not as a wildcard');
 
     assert.equal((await call('/products/2')).body.product.name, 'Nitrile Examination Gloves, Blue');
     assert.equal((await call('/products/999')).status, 404);
@@ -311,8 +314,8 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
     await call(`/orders/${save.body.order.id}/cancel`, { method: 'POST', cookie: shopper, body: {} });
     assert.deepEqual(await codes(), ['SAVE100', 'BULK15'], 'cancelling gives the code back');
 
-    const bulk = await order('BULK15', [{ id: 2, quantity: 20 }]);
-    assert.deepEqual(totals(bulk.body.order), { subtotal: 10980, discount: 1500, couponCode: 'BULK15', deliveryFee: 0, total: 9480 }, '15% capped at ₹1,500; free delivery goes by the subtotal');
+    const bulk = await order('BULK15', [{ id: 60, quantity: 11 }]);
+    assert.deepEqual(totals(bulk.body.order), { subtotal: 11000, discount: 1500, couponCode: 'BULK15', deliveryFee: 0, total: 9500 }, '15% capped at ₹1,500; free delivery goes by the subtotal');
   });
 
   test('a switched-off or expired coupon can’t be used', async () => {
