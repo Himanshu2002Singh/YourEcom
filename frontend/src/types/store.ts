@@ -17,6 +17,7 @@ export type Product = {
   gallery: string[]; // more photos after `image`
   description: string;
   features: string[];
+  specs: [string, string][]; // the details table: [['Needle', 'Included, 24G'], ...]
   rating: number | null; // average stars, null before the first review
   reviewCount: number;
 };

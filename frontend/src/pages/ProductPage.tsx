@@ -107,6 +107,7 @@ export function ProductPage({ products, openCart, user, reloadProducts, ...shop 
     ['Category', product.category],
     ...(product.variant ? [[variantLabel(sizes), product.variant] as [string, string]] : []),
     ['Pack', product.unit],
+    ...product.specs,
     ['Sold by', 'YourEcom, New Delhi'],
   ];
 

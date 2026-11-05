@@ -119,6 +119,7 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
       description:
         'The Magnum Face Mask (Class 1, 2, and 3) is a high-quality 3-ply disposable mask designed for effective protection against airborne particles, dust, and contaminants. These masks provide varying levels of filtration and breathability, ensuring safety and comfort for different environments, from general use to medical and industrial settings.',
       features: ['ISI marked, IS 16289:2014', 'Ear loops and nose wire', 'Box of 50, carton of 3000'],
+      specs: [['Brand', 'Magnum'], ['Layers', '3-ply with meltblown filter'], ['Bacterial filtration (BFE)', 'Over 95%'], ['Fastening', 'Ear loops'], ['Nose pin', 'Yes'], ['Edges', 'Ultrasonic sealed'], ['Made in', 'India'], ['Minimum order', '1,000 pieces (wholesale)']],
     });
     assert.equal('badge' in products[3], false, 'a product without a badge has no badge key');
     assert.deepEqual([products[2].family, products[2].variant], ['Disposable Syringe without Needle', '2 ml'], 'a size names its family and variant');

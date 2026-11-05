@@ -17,6 +17,7 @@ export function productView(row) {
     gallery: row.gallery ?? [],
     description: row.description,
     features: row.features,
+    specs: row.specs ?? [],
     rating: row.rating === null ? null : Number(row.rating),
     reviewCount: Number(row.review_count),
   };
