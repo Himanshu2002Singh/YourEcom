@@ -1,6 +1,7 @@
-// /api/auth/* — email + password accounts: register, sign in, sign out and forgotten passwords.
+// /api/auth/* — accounts: register, sign in (with a password or with Google), sign out and forgotten passwords.
 import * as PasswordReset from '../models/passwordReset.model.js';
 import * as User from '../models/user.model.js';
+import { googleClientId, verifyGoogleCredential } from '../utils/google.js';
 import { HttpError } from '../utils/HttpError.js';
 import { appUrl, mailReady, sendMail } from '../utils/mailer.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
@@ -25,11 +26,28 @@ export async function register(request, response) {
 export async function login(request, response) {
   const email = cleanEmail(request.body.email);
   const user = await User.findByEmail(email);
+  if (user && !user.password_hash) {
+    throw new HttpError(401, 'This account signs in with Google. Use the Google button, or choose a password with “Forgot password?”.');
+  }
   if (!user || !await verifyPassword(String(request.body.password ?? ''), user.password_hash)) {
     throw new HttpError(401, 'Email or password is incorrect.');
   }
   startSession(request, response, user);
   response.json({ user: userView(user) });
+}
+
+// GET /api/auth/google — the OAuth client ID for Google's button, or null when Google sign-in isn't set up
+// here (the storefront then leaves the button out).
+export function googleClient(request, response) {
+  response.json({ clientId: googleClientId() });
+}
+
+// POST /api/auth/google { credential } — the ID token Google's button gave the browser. Signs in the account
+// for that Google account, creating it the first time (201).
+export async function googleSignIn(request, response) {
+  const { user, created } = await User.signInWithGoogle(await verifyGoogleCredential(request.body.credential));
+  startSession(request, response, user);
+  response.status(created ? 201 : 200).json({ user: userView(user) });
 }
 
 export function logout(request, response) {

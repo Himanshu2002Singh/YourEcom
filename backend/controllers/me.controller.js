@@ -19,14 +19,15 @@ export async function saveName(request, response) {
   response.json({ user: userView(user) });
 }
 
-// PUT /api/me/password { currentPassword, newPassword }. Every other browser is signed out;
-// this one gets a fresh session cookie.
+// PUT /api/me/password { currentPassword, newPassword }. An account made with Google has no password yet and
+// sets its first one without currentPassword. Every other browser is signed out; this one gets a fresh session cookie.
 export async function changePassword(request, response) {
   const { currentPassword, newPassword } = request.body;
-  if (!await verifyPassword(String(currentPassword ?? ''), request.user.password_hash)) throw new HttpError(400, 'Your current password is incorrect.');
+  const hasPassword = Boolean(request.user.password_hash);
+  if (hasPassword && !await verifyPassword(String(currentPassword ?? ''), request.user.password_hash)) throw new HttpError(400, 'Your current password is incorrect.');
   const problem = passwordProblem(newPassword);
   if (problem) throw new HttpError(400, problem);
-  if (newPassword === currentPassword) throw new HttpError(400, 'Choose a new password that’s different from your current one.');
+  if (hasPassword && newPassword === currentPassword) throw new HttpError(400, 'Choose a new password that’s different from your current one.');
   const user = await User.updatePassword(request.user.id, await hashPassword(newPassword));
   startSession(request, response, user);
   response.json({ user: userView(user) });

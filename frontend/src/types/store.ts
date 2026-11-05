@@ -33,6 +33,7 @@ export type User = {
   name: string;
   email: string;
   memberSince: number;
+  hasPassword: boolean; // false for an account made with Google until a password is set
   preferences: { smsUpdates: boolean; offers: boolean };
 };
 

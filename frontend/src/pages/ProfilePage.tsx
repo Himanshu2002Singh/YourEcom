@@ -82,21 +82,22 @@ function NameForm({ name, saveName }: { name: string; saveName: ProfilePageProps
   );
 }
 
-function PasswordForm({ changePassword }: { changePassword: ProfilePageProps['changePassword'] }) {
+// An account made with Google has no password yet: it sets one, without a current password.
+function PasswordForm({ changePassword, hasPassword }: { changePassword: ProfilePageProps['changePassword']; hasPassword: boolean }) {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [state, setState] = useState<SaveState>(idle);
 
   const submit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
-    if (!current) return setState({ ...idle, error: 'Enter your current password' });
+    if (hasPassword && !current) return setState({ ...idle, error: 'Enter your current password' });
     if (next.length < 6) return setState({ ...idle, error: 'New password must be at least 6 characters' });
     setState({ ...idle, saving: true });
     try {
       await changePassword(current, next);
       setCurrent('');
       setNext('');
-      setState({ ...idle, done: 'Password changed. Other devices have been signed out.' });
+      setState({ ...idle, done: hasPassword ? 'Password changed. Other devices have been signed out.' : 'Password set. You can now also sign in with your email.' });
     } catch (error) {
       setState({ ...idle, error: (error as Error).message });
     }
@@ -109,13 +110,17 @@ function PasswordForm({ changePassword }: { changePassword: ProfilePageProps['ch
 
   return (
     <form onSubmit={submit} noValidate className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
-      <h2 className="text-xl font-semibold text-navy">Change password</h2>
-      <p className="mt-1 text-sm text-slate-500">You’ll stay signed in here; other devices are signed out.</p>
+      <h2 className="text-xl font-semibold text-navy">{hasPassword ? 'Change password' : 'Set a password'}</h2>
+      <p className="mt-1 text-sm text-slate-500">
+        {hasPassword ? 'You’ll stay signed in here; other devices are signed out.' : 'You sign in with Google. Add a password to sign in with your email too.'}
+      </p>
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <TextField name="current-password" label="Current password" type="password" icon={LockKeyhole} autoComplete="current-password" value={current} onChange={typed(setCurrent)} />
+        {hasPassword && (
+          <TextField name="current-password" label="Current password" type="password" icon={LockKeyhole} autoComplete="current-password" value={current} onChange={typed(setCurrent)} />
+        )}
         <TextField name="new-password" label="New password" type="password" icon={KeyRound} autoComplete="new-password" hint="At least 6 characters" value={next} onChange={typed(setNext)} />
       </div>
-      <SaveRow label="Change password" state={state} />
+      <SaveRow label={hasPassword ? 'Change password' : 'Set password'} state={state} />
     </form>
   );
 }
@@ -230,7 +235,7 @@ export function ProfilePage({ user, orders, signOut, updatePreferences, saveName
       </div>
       <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
         <NameForm name={user.name} saveName={saveName} />
-        <PasswordForm changePassword={changePassword} />
+        <PasswordForm changePassword={changePassword} hasPassword={user.hasPassword} />
       </div>
     </main>
   );

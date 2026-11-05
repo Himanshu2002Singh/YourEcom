@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import app from '../app.js';
 import { closeDb, query } from '../db/pool.js';
+import * as User from '../models/user.model.js';
 
 let server;
 let base;
@@ -74,6 +75,23 @@ describe('without a database', () => {
   test('an unknown product category is rejected before touching the database', async () => {
     assert.equal((await call('/products?category=Toys')).status, 400);
   });
+
+  test('Google sign-in: no client ID hides it, and only a token Google signed gets in', async () => {
+    const saved = process.env.GOOGLE_CLIENT_ID;
+    try {
+      delete process.env.GOOGLE_CLIENT_ID;
+      assert.deepEqual((await call('/auth/google')).body, { clientId: null });
+      assert.equal((await call('/auth/google', { method: 'POST', body: { credential: 'a.b.c' } })).status, 503);
+      process.env.GOOGLE_CLIENT_ID = 'test-client.apps.googleusercontent.com';
+      assert.deepEqual((await call('/auth/google')).body, { clientId: 'test-client.apps.googleusercontent.com' });
+      for (const credential of [undefined, 'not-a-token', 'eyJhbGciOiJub25lIn0.eyJzdWIiOiIxIn0.x']) {
+        assert.equal((await call('/auth/google', { method: 'POST', body: { credential } })).status, 401, String(credential));
+      }
+    } finally {
+      if (saved === undefined) delete process.env.GOOGLE_CLIENT_ID;
+      else process.env.GOOGLE_CLIENT_ID = saved;
+    }
+  });
 });
 
 describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not set' }, () => {
@@ -140,7 +158,7 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
   test('registering signs the customer in, with both preferences on', async () => {
     const result = await call('/auth/register', { method: 'POST', body: { name: '  Test Customer ', email: email.toUpperCase(), password: 'first-password' } });
     assert.equal(result.status, 201);
-    assert.deepEqual(result.body.user, { name: 'Test Customer', email, memberSince: new Date().getUTCFullYear(), preferences: { smsUpdates: true, offers: true } });
+    assert.deepEqual(result.body.user, { name: 'Test Customer', email, memberSince: new Date().getUTCFullYear(), hasPassword: true, preferences: { smsUpdates: true, offers: true } });
     assert.match(result.cookie, /^ye_session=/);
     cookie = result.cookie;
     assert.deepEqual((await call('/me', { cookie })).body, { user: result.body.user });
@@ -157,6 +175,35 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
     assert.equal(login.status, 200);
     assert.equal((await call('/me', { cookie: login.cookie })).body.user.email, email);
     assert.equal((await call('/auth/logout', { method: 'POST', body: {} })).cookie, 'ye_session=');
+  });
+
+  test('Google sign-in makes an account once, and links the account that already has that email', async () => {
+    const googleEmail = `test-${stamp}-google@example.com`;
+    const first = await User.signInWithGoogle({ googleId: `test-${stamp}-1`, email: googleEmail, name: 'Google Customer' });
+    assert.equal(first.created, true);
+    assert.equal(first.user.password_hash, null);
+    const again = await User.signInWithGoogle({ googleId: `test-${stamp}-1`, email: googleEmail, name: 'Google Customer' });
+    assert.deepEqual([again.created, again.user.id], [false, first.user.id]);
+    const login = await call('/auth/login', { method: 'POST', body: { email: googleEmail, password: 'any-password' } });
+    assert.equal(login.status, 401);
+    assert.match(login.body.error, /signs in with Google/);
+
+    const linked = await User.signInWithGoogle({ googleId: `test-${stamp}-2`, email, name: 'Someone Else' });
+    assert.equal(linked.created, false);
+    assert.deepEqual([linked.user.email, linked.user.google_id, linked.user.name], [email, `test-${stamp}-2`, 'Test Customer'], 'linking keeps the account as it was');
+    await assert.rejects(User.signInWithGoogle({ googleId: `test-${stamp}-3`, email, name: 'Test Customer' }), { status: 409 });
+    assert.equal((await call('/auth/login', { method: 'POST', body: { email, password: 'first-password' } })).status, 200, 'its password still works');
+  });
+
+  test('an account without a password sets its first one without a current password', async () => {
+    const noPassword = `test-${stamp}-nopassword@example.com`;
+    const { cookie: session } = await call('/auth/register', { method: 'POST', body: { name: 'No Password', email: noPassword, password: 'temporary-password' } });
+    await query('UPDATE users SET password_hash = NULL WHERE email = ?', [noPassword]);
+    assert.equal((await call('/me', { cookie: session })).body.user.hasPassword, false);
+    const set = await call('/me/password', { method: 'PUT', cookie: session, body: { newPassword: 'chosen-password' } });
+    assert.equal(set.status, 200);
+    assert.equal(set.body.user.hasPassword, true);
+    assert.equal((await call('/auth/login', { method: 'POST', body: { email: noPassword, password: 'chosen-password' } })).status, 200);
   });
 
   test('the name can be changed', async () => {

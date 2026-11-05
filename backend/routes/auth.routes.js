@@ -16,5 +16,7 @@ router.post('/login', loginLimit, auth.login);
 router.post('/logout', auth.logout);
 router.post('/forgot-password', resetEmailLimit, auth.forgotPassword);
 router.post('/reset-password', auth.resetPassword);
+router.get('/google', auth.googleClient);
+router.post('/google', auth.googleSignIn);
 
 export default router;

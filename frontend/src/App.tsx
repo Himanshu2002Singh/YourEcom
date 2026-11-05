@@ -188,7 +188,8 @@ function App() {
 
   const changePassword = async (currentPassword: string, newPassword: string): Promise<void> => {
     try {
-      await api('/me/password', { method: 'PUT', body: { currentPassword, newPassword } });
+      const { user: saved } = await api<{ user: User }>('/me/password', { method: 'PUT', body: { currentPassword, newPassword } });
+      setUser(saved);
     } catch (error) {
       endIfSignedOut(error);
       throw error;
@@ -214,6 +215,13 @@ function App() {
       method: 'POST',
       body: mode === 'login' ? { email, password } : { name, email, password },
     });
+    setUser(signedIn);
+    notify(`Welcome, ${signedIn.name.split(' ')[0]}`);
+  };
+
+  // With the ID token from Google's button: rejects with the API's message for the page to show.
+  const signInWithGoogle = async (credential: string): Promise<void> => {
+    const { user: signedIn } = await api<{ user: User }>('/auth/google', { method: 'POST', body: { credential } });
     setUser(signedIn);
     notify(`Welcome, ${signedIn.name.split(' ')[0]}`);
   };
@@ -292,7 +300,7 @@ function App() {
             )),
           )}
         />
-        <Route path="/login" element={<LoginPage user={user} signIn={signIn} />} />
+        <Route path="/login" element={<LoginPage user={user} signIn={signIn} signInWithGoogle={signInWithGoogle} />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage resetPassword={resetPassword} />} />
         <Route

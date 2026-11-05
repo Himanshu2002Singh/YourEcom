@@ -6,12 +6,22 @@ CREATE TABLE IF NOT EXISTS users (
   id            CHAR(36)     NOT NULL PRIMARY KEY,
   email         VARCHAR(254) NOT NULL UNIQUE,
   name          VARCHAR(120) NOT NULL,
-  password_hash VARCHAR(200) NOT NULL,
+  password_hash VARCHAR(200) NULL,                  -- NULL for an account made with Google that has no password yet
+  google_id     VARCHAR(255) NULL UNIQUE,           -- the Google account ("sub") it signs in with, if any
   session_version INT        NOT NULL DEFAULT 0,      -- goes up with each password change, ending older sessions
   sms_updates   BOOLEAN      NOT NULL DEFAULT TRUE,   -- preferences.smsUpdates
   offers        BOOLEAN      NOT NULL DEFAULT TRUE,   -- preferences.offers
   created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP   -- its year is memberSince
 );
+
+-- Databases made before Sign in with Google get its column here, and passwords become optional.
+SET @add_google := IF(
+  (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'users' AND column_name = 'google_id') = 0,
+  'ALTER TABLE users MODIFY password_hash VARCHAR(200) NULL, ADD COLUMN google_id VARCHAR(255) NULL UNIQUE AFTER password_hash',
+  'DO 0');
+PREPARE add_google FROM @add_google;
+EXECUTE add_google;
+DEALLOCATE PREPARE add_google;
 
 -- The catalogue. Prices are whole rupees. Orders keep their own copy of what they need.
 -- Sizes of one product share a family (its name on the storefront) and differ by variant.

@@ -1,6 +1,7 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { Link, Navigate, useLocation } from 'react-router';
 import { ArrowLeft, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, UserRound } from 'lucide-react';
+import { GoogleSignInButton } from '@/components/GoogleSignInButton';
 import { TextField } from '@/components/TextField';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import type { User } from '@/types/store';
@@ -11,6 +12,8 @@ type LoginPageProps = {
   user: User | null | undefined; // undefined while the session is being checked
   // Signs in or creates the account through the API; rejects with a message to show.
   signIn: (details: { mode: Mode } & Record<Field, string>) => Promise<void>;
+  // Signs in with the ID token from Google's button, making the account the first time.
+  signInWithGoogle: (credential: string) => Promise<void>;
 };
 
 const errorFor = (field: Field, value: string): string | undefined => {
@@ -19,7 +22,7 @@ const errorFor = (field: Field, value: string): string | undefined => {
   return value.length >= 6 ? undefined : 'Password must be at least 6 characters';
 };
 
-export function LoginPage({ user, signIn }: LoginPageProps) {
+export function LoginPage({ user, signIn, signInWithGoogle }: LoginPageProps) {
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from;
   const [mode, setMode] = useState<Mode>('login');
@@ -65,6 +68,17 @@ export function LoginPage({ user, signIn }: LoginPageProps) {
     try {
       // On success the user prop arrives and the redirect above takes over.
       await signIn({ mode, name: values.name.trim(), email: values.email.trim().toLowerCase(), password: values.password });
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Something went wrong. Try again.');
+      setPending(false);
+    }
+  };
+
+  const googleSubmit = async (credential: string): Promise<void> => {
+    setPending(true);
+    setFormError('');
+    try {
+      await signInWithGoogle(credential);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Something went wrong. Try again.');
       setPending(false);
@@ -163,6 +177,7 @@ export function LoginPage({ user, signIn }: LoginPageProps) {
               {pending ? 'Please wait…' : isLogin ? 'Sign in to YourEcom' : 'Create my account'}
             </button>
           </form>
+          <GoogleSignInButton text={isLogin ? 'signin_with' : 'signup_with'} onSignIn={googleSubmit} />
           <p className="mt-6 text-center text-sm font-semibold text-slate-400">
             By continuing, you agree to our{' '}
             <Link to="/policies/terms" className="text-slate-500 underline underline-offset-2 hover:text-brand">
