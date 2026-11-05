@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { Banknote, ChevronRight, MapPin, ShoppingCart, Truck, Zap } from 'lucide-react';
+import { Banknote, ChevronRight, MapPin, ShoppingCart, TriangleAlert, Truck, Zap } from 'lucide-react';
 import { ProductReviews } from '@/components/ProductReviews';
 import { QuantityStepper } from '@/components/QuantityStepper';
 import { Price, ProductCard, RatingSummary, SaveButton, StockNote, WhatsAppIcon, panel, type ShopActions } from '@/components/StoreShared';
+import { NON_MEDICAL_CATEGORY } from '@/data/categories';
 import { ADDRESS, PHONE, PHONE_LINK, whatsAppLink } from '@/data/contact';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { NO_API } from '@/lib/api';
 import { categoryPath, discountOf, groupByFamily, groupName, variantLabel, type ProductGroup } from '@/lib/catalogue';
-import { DELIVERY_FEE, FREE_DELIVERY_THRESHOLD, formatPrice } from '@/lib/pricing';
+import { DELIVERY_FEE, FREE_DELIVERY_THRESHOLD, formatPrice, perItemPrice } from '@/lib/pricing';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import type { Product, User } from '@/types/store';
 
@@ -59,7 +60,8 @@ export function ProductPage({ products, openCart, user, reloadProducts, ...shop 
   if (!product) return <NotFoundPage />;
   const quantity = quantityOf(product.id);
   const soldOut = product.stock === 0;
-  const sizes = product.family ? products.filter((item: Product) => item.family === product.family) : [product];
+  const sizes = product.family ? groupByFamily(products.filter((item: Product) => item.family === product.family))[0] : [product];
+  const perItem = perItemPrice(product);
   // The rest of the category first, otherwise anything else; never this product's own sizes.
   const others = products.filter((item: Product) => groupName(item) !== groupName(product));
   const sameCategory = others.filter((item: Product) => item.category === product.category);
@@ -143,9 +145,25 @@ export function ProductPage({ products, openCart, user, reloadProducts, ...shop 
           <div className="mt-4">
             {discountOf(product) > 0 && <p className="text-sm font-bold text-deal">Special price</p>}
             <Price product={product} large />
-            <p className="mt-1 text-sm text-slate-500">{product.unit} · Inclusive of all taxes</p>
+            <p className="mt-1 text-sm text-slate-500">
+              {product.unit}
+              {perItem && ` (${perItem})`} · Inclusive of all taxes
+            </p>
             <StockNote stock={product.stock} className="mt-2 text-sm" />
           </div>
+
+          {product.category === NON_MEDICAL_CATEGORY && (
+            <p className="mt-4 flex gap-2.5 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              <TriangleAlert size={18} className="mt-0.5 shrink-0" />
+              <span>
+                <strong>Not for medical use.</strong> Everything in this section is a toy or a party item. For injections, see our{' '}
+                <Link to={categoryPath('Syringes')} className="font-bold underline">
+                  sterile medical syringes
+                </Link>
+                .
+              </span>
+            </p>
+          )}
 
           {sizes.length > 1 && (
             <div className="mt-5">
