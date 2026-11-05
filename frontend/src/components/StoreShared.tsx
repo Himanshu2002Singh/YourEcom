@@ -119,7 +119,7 @@ export function ProductCard({ group, isSaved, toggleSaved, ...cart }: ShopAction
       <Link to={productPath} tabIndex={-1} aria-hidden="true" className="group block aspect-square overflow-hidden rounded bg-slate-50">
         <img src={product.image} alt="" loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
       </Link>
-      {product.badge && <span className="absolute left-3 top-6 rounded-r bg-brand px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">{product.badge}</span>}
+      {product.badge && <span className="absolute left-3 top-6 max-w-[calc(100%-4.5rem)] rounded-r bg-brand px-2 py-0.5 text-[11px] font-bold uppercase leading-tight tracking-wide text-white">{product.badge}</span>}
       <div className="absolute right-5 top-5">
         <SaveButton product={product} saved={isSaved(product.id)} toggleSaved={toggleSaved} />
       </div>
