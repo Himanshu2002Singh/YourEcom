@@ -1,7 +1,8 @@
 import { Link } from 'react-router';
 import { BadgeCheck, ChevronRight, Headset, Mail, MapPin, Phone, ShieldCheck, Truck, type LucideIcon } from 'lucide-react';
 import { LoadError, Loading, ProductCard, WhatsAppIcon, panel, type ShopActions } from '@/components/StoreShared';
-import { categories, categoryImages } from '@/data/categories';
+import { NON_MEDICAL_CATEGORY, categories, categoryImages } from '@/data/categories';
+import { ABOUT_TEXT, governmentBuyers } from '@/data/company';
 import { ADDRESS, EMAIL, MAP_LINK, PHONE, PHONE_LINK, whatsAppLink } from '@/data/contact';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { byCategory, categoryPath, discountOf, groupByFamily, groupName, variantSummary, type ProductGroup } from '@/lib/catalogue';
@@ -13,8 +14,9 @@ const QUOTE_MESSAGE = 'Hello YourEcom, please send a quotation for our hospital 
 
 // After the syringes, every other category gets a panel, four to a row as on a marketplace home page.
 const PANEL_ROWS: Category[][] = [
-  ['IV Cannula', 'IV Sets', 'Gloves', 'Face Masks'],
-  ['Caps & Shoe Covers', 'Bandages & Gauze', 'Lab Disposables'],
+  ['IV Cannula', 'IV Sets', 'IV Fluids', 'Gloves'],
+  ['Face Masks', 'Caps & Shoe Covers', 'Bandages & Gauze', 'Surgical Tapes'],
+  ['Lab Disposables', NON_MEDICAL_CATEGORY],
 ];
 
 // What the client promises, from their posters.
@@ -43,7 +45,7 @@ function CategoryPanel({ category, groups }: { category: Category; groups: Produ
     const off = bestDiscount(group);
     return (
       <Link to={`/product/${first.id}`} className="group block">
-        <img src={first.image} alt="" loading="lazy" className={`w-full rounded object-cover ${large ? 'aspect-[4/3]' : 'aspect-square'}`} />
+        <img src={first.image} alt="" loading="lazy" className={`w-full rounded object-cover ${large ? 'aspect-video sm:aspect-[4/3]' : 'aspect-square'}`} />
         <p className={`mt-1.5 line-clamp-2 text-slate-700 group-hover:text-brand ${large ? 'text-sm' : 'text-xs'}`}>{group.length > 1 ? groupName(first) : first.name}</p>
         <p className={large ? 'text-sm' : 'text-xs'}>
           <span className="font-bold text-slate-900">
@@ -59,14 +61,18 @@ function CategoryPanel({ category, groups }: { category: Category; groups: Produ
   return (
     <section className={`${panel} flex flex-col p-4`}>
       <h2 className="text-lg font-bold text-slate-900">{category}</h2>
+      {category === NON_MEDICAL_CATEGORY && <p className="text-xs font-bold text-amber-700">Toys, play sets and party syringes. Not for medical use.</p>}
       {groups.length === 1 ? (
         <div className="mt-3 flex-1">{tile(groups[0], true)}</div>
       ) : (
-        <ul className="mt-3 grid flex-1 grid-cols-2 content-start gap-3">
+        // On phones the tiles make one row that scrolls sideways, which keeps a dozen panels from becoming a very long page.
+        <ul className="mt-3 flex flex-1 gap-3 overflow-x-auto scrollbar-none sm:grid sm:grid-cols-2 sm:content-start sm:overflow-visible">
           {groups.slice(0, 3).map((group: ProductGroup) => (
-            <li key={group[0].id}>{tile(group, false)}</li>
+            <li key={group[0].id} className="w-[38%] shrink-0 sm:w-auto">
+              {tile(group, false)}
+            </li>
           ))}
-          <li>
+          <li className="w-[38%] shrink-0 sm:w-auto">
             <Link to={categoryPath(category)} className="flex aspect-square flex-col items-center justify-center gap-1 rounded bg-brand-soft text-center text-xs font-bold text-brand transition hover:bg-brand hover:text-white">
               <ChevronRight size={22} /> See all
             </Link>
@@ -149,7 +155,7 @@ export function HomePage({ products, catalogueError, reloadProducts, ...shop }: 
           </div>
 
           <section className="relative overflow-hidden rounded-md bg-navy text-white">
-            <img src="/photos/warehouse-stock.jpg" alt="" className="absolute inset-y-0 right-0 hidden h-full w-1/2 object-cover sm:block [mask-image:linear-gradient(to_right,transparent,black_45%)]" />
+            <img src="/photos/stock-cartons.jpg" alt="" className="absolute inset-y-0 right-0 hidden h-full w-1/2 object-cover sm:block [mask-image:linear-gradient(to_right,transparent,black_45%)]" />
             <div className="relative max-w-xl px-5 py-7 sm:px-8 sm:py-9">
               <p className="text-xs font-bold uppercase tracking-widest text-cart">Wholesale · Retail · Government supply · Local supply</p>
               <h2 className="mt-2 text-2xl font-bold leading-snug sm:text-3xl">Supplies for government hospitals, clinics and institutions</h2>
@@ -168,10 +174,34 @@ export function HomePage({ products, catalogueError, reloadProducts, ...shop }: 
                 </a>
               </div>
             </div>
+            <div className="relative flex flex-wrap items-baseline gap-x-6 gap-y-2 border-t border-white/10 bg-navy-dark/90 px-5 py-4 sm:px-8">
+              <Link to="/about#supplied-to" className="flex shrink-0 items-center gap-1 text-xs font-bold uppercase tracking-widest text-cart hover:underline">
+                Supplied to <ChevronRight size={14} />
+              </Link>
+              <ul className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm font-semibold">
+                {governmentBuyers.map(([short, full]) => (
+                  <li key={short}>
+                    {short === full ? (
+                      short
+                    ) : (
+                      <abbr title={full} className="no-underline">
+                        {short}
+                      </abbr>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </section>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {PANEL_ROWS[1].map((category: Category) => (
+              <CategoryPanel key={category} category={category} groups={groupsIn(category)} />
+            ))}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {PANEL_ROWS[2].map((category: Category) => (
               <CategoryPanel key={category} category={category} groups={groupsIn(category)} />
             ))}
             <section className={`${panel} flex flex-col p-4`}>
@@ -182,18 +212,33 @@ export function HomePage({ products, catalogueError, reloadProducts, ...shop }: 
                 Shop caps and shoe covers
               </Link>
             </section>
+            <section className={`${panel} flex flex-col p-4`}>
+              <h2 className="text-lg font-bold text-slate-900">About YourEcom</h2>
+              <img src="/photos/stock-packing-room.jpg" alt="Cartons and bags of syringes in our stock" loading="lazy" className="mt-3 aspect-[4/3] w-full rounded object-cover" />
+              <p className="mt-2 line-clamp-3 text-sm text-slate-600">{ABOUT_TEXT}</p>
+              <Link to="/about" className="mt-auto pt-3 text-sm font-medium text-brand hover:underline">
+                Read about us
+              </Link>
+            </section>
           </div>
 
           <section className={panel}>
             <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-4 py-3">
-              <h2 className="text-lg font-bold text-slate-900 sm:text-xl">All products</h2>
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 sm:text-xl">One from every category</h2>
+                <p className="text-sm text-slate-500">
+                  {products.length} products in {categories.length} categories
+                </p>
+              </div>
               <Link to="/products" className={viewAllClass}>
                 View all <ChevronRight size={16} />
               </Link>
             </div>
-            <div className="grid grid-cols-2 gap-2 p-2 sm:grid-cols-3 sm:gap-3 sm:p-3 lg:grid-cols-4 xl:grid-cols-5">
-              {groups.map((group: ProductGroup) => (
-                <ProductCard key={group[0].id} group={group} {...shop} />
+            <div className="flex gap-2 overflow-x-auto p-2 scrollbar-none sm:grid sm:grid-cols-3 sm:gap-3 sm:overflow-visible sm:p-3 lg:grid-cols-4 xl:grid-cols-6">
+              {categories.flatMap((category) => groupsIn(category).slice(0, 1)).map((group: ProductGroup) => (
+                <div key={group[0].id} className="w-[46%] shrink-0 sm:w-auto">
+                  <ProductCard group={group} {...shop} />
+                </div>
               ))}
             </div>
           </section>
