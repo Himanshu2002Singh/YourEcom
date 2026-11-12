@@ -63,7 +63,7 @@ export async function cancelForUser(userId, id) {
     const [[order]] = await connection.execute('SELECT status, items FROM orders WHERE id = ? AND user_id = ? FOR UPDATE', [id, userId]);
     if (!order) throw new HttpError(404, 'Order not found.');
     if (order.status === 'Cancelled') throw new HttpError(409, 'This order is already cancelled.');
-    if (order.status !== 'Processing') throw new HttpError(409, 'This order has already been delivered, so it can’t be cancelled.');
+    if (order.status !== 'Processing') throw new HttpError(409, `This order has already ${order.status === 'Shipped' ? 'shipped' : 'been delivered'}, so it can’t be cancelled.`);
     await connection.execute("UPDATE orders SET status = 'Cancelled' WHERE id = ?", [id]);
     for (const { id: productId, quantity } of order.items) await connection.execute('UPDATE products SET stock = stock + ? WHERE id = ?', [quantity, productId]);
   });

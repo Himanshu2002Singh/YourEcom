@@ -453,11 +453,21 @@ CREATE TABLE IF NOT EXISTS orders (
   total          INT                            NOT NULL,   -- subtotal - discount + delivery_fee
   delivery       JSON                           NOT NULL,   -- { name, phone, address, city, pincode }
   payment_method ENUM('online', 'cod')          NOT NULL,
-  status         ENUM('Processing', 'Delivered', 'Cancelled') NOT NULL DEFAULT 'Processing',
+  status         ENUM('Processing', 'Shipped', 'Delivered', 'Cancelled') NOT NULL DEFAULT 'Processing',
+  tracking       VARCHAR(200)                   NULL,       -- courier and tracking number, from the admin pages when it ships
   placed_at      TIMESTAMP(6)                   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),   -- microseconds keep "newest first" exact
   INDEX orders_by_user (user_id, placed_at),
   CONSTRAINT orders_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
+
+-- Databases made before the Shipped status get it here, with the tracking column.
+SET @add_shipped := IF(
+  (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'orders' AND column_name = 'tracking') = 0,
+  'ALTER TABLE orders MODIFY status ENUM(''Processing'', ''Shipped'', ''Delivered'', ''Cancelled'') NOT NULL DEFAULT ''Processing'', ADD COLUMN tracking VARCHAR(200) NULL AFTER status',
+  'DO 0');
+PREPARE add_shipped FROM @add_shipped;
+EXECUTE add_shipped;
+DEALLOCATE PREPARE add_shipped;
 
 -- Discount codes for the checkout. Each customer can use a code once; a cancelled order gives
 -- it back. To retire a code, set active to FALSE (orders keep their own copy of the code).

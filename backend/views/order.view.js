@@ -4,6 +4,7 @@ const itemView = ({ id, name, price, unit, image, quantity }) => ({ id, name, pr
 const deliveryView = ({ name, phone, address, city, pincode }) => ({ name, phone, address, city, pincode });
 
 // `user` is the customer who placed it (every order route is for the customer's own orders).
+// `tracking` (courier and tracking number) is null until the order ships.
 export function orderView(row, user) {
   return {
     id: row.id,
@@ -18,5 +19,6 @@ export function orderView(row, user) {
     delivery: deliveryView(row.delivery),
     paymentMethod: row.payment_method,
     status: row.status,
+    tracking: row.tracking,
   };
 }

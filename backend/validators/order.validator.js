@@ -5,7 +5,7 @@ import { HttpError } from '../utils/HttpError.js';
 export const MAX_QUANTITY = 999;
 const MAX_LINES = 50;
 const PAYMENT_METHODS = ['online', 'cod'];
-const STATUSES = ['Processing', 'Delivered', 'Cancelled'];
+export const STATUSES = ['Processing', 'Shipped', 'Delivered', 'Cancelled'];
 const PHONE = /^(\+91[\s-]?|0)?[6-9]\d{4}[\s-]?\d{5}$/;
 const PINCODE = /^[1-9]\d{5}$/;
 const COUPON_CODE = /^[A-Z0-9]{1,30}$/;

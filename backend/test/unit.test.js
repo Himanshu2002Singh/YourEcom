@@ -61,8 +61,9 @@ test('phone numbers and pincodes follow the checkout form', () => {
   }
 });
 
-test('the order status filter is optional and only Processing, Delivered or Cancelled', () => {
+test('the order status filter is optional and only Processing, Shipped, Delivered or Cancelled', () => {
   assert.equal(cleanStatus(undefined), null);
+  assert.equal(cleanStatus('Shipped'), 'Shipped');
   assert.equal(cleanStatus('Delivered'), 'Delivered');
   assert.equal(cleanStatus('Cancelled'), 'Cancelled');
   assert.throws(() => cleanStatus('delivered'), { status: 400 });

@@ -251,6 +251,7 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
       delivery,
       paymentMethod: 'cod',
       status: 'Processing',
+      tracking: null,
     });
     firstOrder = result.body.order;
   });
@@ -288,7 +289,8 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
     const ids = async status => (await call(`/orders?status=${status}`, { cookie })).body.orders.map(order => order.id);
     assert.deepEqual(await ids('Delivered'), [firstOrder.id]);
     assert.deepEqual(await ids('Processing'), [orders[0].id]);
-    assert.equal((await call('/orders?status=Shipped', { cookie })).status, 400);
+    assert.deepEqual(await ids('Shipped'), []);
+    assert.equal((await call('/orders?status=Lost', { cookie })).status, 400);
     assert.deepEqual((await call(`/orders/${firstOrder.id}`, { cookie })).body.order, { ...firstOrder, status: 'Delivered' });
 
     const other = (await call('/auth/register', { method: 'POST', body: { name: 'Other Customer', email: otherEmail, password: 'other-password' } })).cookie;
