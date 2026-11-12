@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
   session_version INT        NOT NULL DEFAULT 0,      -- goes up with each password change, ending older sessions
   sms_updates   BOOLEAN      NOT NULL DEFAULT TRUE,   -- preferences.smsUpdates
   offers        BOOLEAN      NOT NULL DEFAULT TRUE,   -- preferences.offers
+  is_admin      BOOLEAN      NOT NULL DEFAULT FALSE,  -- may use the admin pages (/admin); set with npm run admin
   created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP   -- its year is memberSince
 );
 
@@ -22,6 +23,15 @@ SET @add_google := IF(
 PREPARE add_google FROM @add_google;
 EXECUTE add_google;
 DEALLOCATE PREPARE add_google;
+
+-- Databases made before the admin pages get is_admin here.
+SET @add_admin := IF(
+  (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'users' AND column_name = 'is_admin') = 0,
+  'ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT FALSE AFTER offers',
+  'DO 0');
+PREPARE add_admin FROM @add_admin;
+EXECUTE add_admin;
+DEALLOCATE PREPARE add_admin;
 
 -- The catalogue. Prices are whole rupees. Orders keep their own copy of what they need.
 -- Sizes of one product share a family (its name on the storefront) and differ by variant.

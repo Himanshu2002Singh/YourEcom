@@ -8,6 +8,7 @@
     "dev": "node --env-file-if-exists=.env --watch server.js",
     "start": "node --env-file-if-exists=.env server.js",
     "db:setup": "node --env-file-if-exists=.env db/setup.js",
+    "admin": "node --env-file-if-exists=.env db/admin.js",
     "test": "node --env-file-if-exists=.env --test \"test/**/*.test.js\""
   },
   "engines": {

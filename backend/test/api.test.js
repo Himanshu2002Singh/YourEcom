@@ -158,7 +158,7 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
   test('registering signs the customer in, with both preferences on', async () => {
     const result = await call('/auth/register', { method: 'POST', body: { name: '  Test Customer ', email: email.toUpperCase(), password: 'first-password' } });
     assert.equal(result.status, 201);
-    assert.deepEqual(result.body.user, { name: 'Test Customer', email, memberSince: new Date().getUTCFullYear(), hasPassword: true, preferences: { smsUpdates: true, offers: true } });
+    assert.deepEqual(result.body.user, { name: 'Test Customer', email, memberSince: new Date().getUTCFullYear(), hasPassword: true, isAdmin: false, preferences: { smsUpdates: true, offers: true } });
     assert.match(result.cookie, /^ye_session=/);
     cookie = result.cookie;
     assert.deepEqual((await call('/me', { cookie })).body, { user: result.body.user });

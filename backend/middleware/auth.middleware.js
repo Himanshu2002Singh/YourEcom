@@ -22,3 +22,11 @@ export async function requireUser(request, response, next) {
   if (!request.user) throw new HttpError(401, 'Sign in to continue.');
   next();
 }
+
+// Same again, and answers 403 unless the account is an admin (users.is_admin, set with npm run admin).
+export async function requireAdmin(request, response, next) {
+  request.user = await sessionUser(request);
+  if (!request.user) throw new HttpError(401, 'Sign in to continue.');
+  if (!request.user.is_admin) throw new HttpError(403, 'This page is for YourEcom staff only.');
+  next();
+}
