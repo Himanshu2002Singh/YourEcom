@@ -34,6 +34,7 @@ export type User = {
   email: string;
   memberSince: number;
   hasPassword: boolean; // false for an account made with Google until a password is set
+  isAdmin: boolean; // may use the admin pages (/admin); the API checks it again on every admin request
   preferences: { smsUpdates: boolean; offers: boolean };
 };
 
@@ -67,3 +68,13 @@ export type Order = {
   status: OrderStatus;
   tracking: string | null; // courier and tracking number, once it ships
 };
+
+// The admin pages' view of an order: the same, with the name on the account that placed it.
+export type AdminOrder = Order & { customerName: string };
+
+// GET /api/admin/orders: one page of orders, how many match, and how many are in each status.
+export type AdminOrderList = { orders: AdminOrder[]; total: number; page: number; pageSize: number; counts: Record<OrderStatus, number> };
+
+// GET /api/admin/summary. Sales are order totals, leaving out cancelled orders.
+export type SalesTotal = { orders: number; sales: number };
+export type AdminSummary = { counts: Record<OrderStatus, number>; today: SalesTotal; last30Days: SalesTotal };

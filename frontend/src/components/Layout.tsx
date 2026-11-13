@@ -159,6 +159,7 @@ export function Header({ cartCount, wishlistCount, openCart, user, products }: H
         [user ? 'My account' : 'Sign in / Create account', accountPath],
         ['My orders', '/orders'],
         ['Wishlist', '/wishlist'],
+        ...(user?.isAdmin ? [['Store admin', '/admin'] as [string, string]] : []),
       ],
     ],
     [
@@ -192,6 +193,12 @@ export function Header({ cartCount, wishlistCount, openCart, user, products }: H
               <span className="text-sm font-bold">Account</span>
             </span>
           </Link>
+          {user?.isAdmin && (
+            <Link to="/admin" className={`${headerItem} hidden flex-col items-start text-xs leading-tight md:flex`}>
+              <span className="text-blue-200">Store</span>
+              <span className="text-sm font-bold">Admin</span>
+            </Link>
+          )}
           <Link to="/orders" className={`${headerItem} hidden flex-col items-start text-xs leading-tight md:flex`}>
             <span className="text-blue-200">Returns</span>
             <span className="text-sm font-bold">&amp; Orders</span>

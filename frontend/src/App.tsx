@@ -1,6 +1,7 @@
 import { startTransition, useCallback, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
-import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
+import { Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { Check, CircleAlert } from 'lucide-react';
+import { AdminLayout, AdminNotFound, AdminStaffOnly } from '@/components/AdminLayout';
 import { CartDrawer } from '@/components/CartDrawer';
 import { Footer, Header, WhatsAppButton } from '@/components/Layout';
 import { LoadError, Loading } from '@/components/StoreShared';
@@ -9,6 +10,9 @@ import { useScrollRestoration } from '@/hooks/useScrollRestoration';
 import { ApiError, NO_API, api } from '@/lib/api';
 import { addToLines, setLineQuantity } from '@/lib/cart';
 import { AboutPage } from '@/pages/AboutPage';
+import { AdminDashboard } from '@/pages/admin/AdminDashboard';
+import { AdminOrderPage } from '@/pages/admin/AdminOrderPage';
+import { AdminOrdersPage } from '@/pages/admin/AdminOrdersPage';
 import { CheckoutPage } from '@/pages/CheckoutPage';
 import { HomePage } from '@/pages/HomePage';
 import { LoginPage } from '@/pages/LoginPage';
@@ -263,6 +267,13 @@ function App() {
     return user ? render(user) : <Navigate to="/login" replace state={{ from: pathname }} />;
   };
 
+  // The admin pages need an account with isAdmin; the API checks it again on every request.
+  const requireAdmin = (render: (currentUser: User) => ReactElement): ReactElement => {
+    if (user === undefined) return <PageStatus><Loading /></PageStatus>;
+    if (!user) return <Navigate to="/login" replace state={{ from: pathname }} />;
+    return user.isAdmin ? render(user) : <AdminStaffOnly />;
+  };
+
   // Pages built from the catalogue wait for it, and offer to try again if it couldn't load.
   const withProducts = (render: (catalogue: Product[]) => ReactElement): ReactElement => {
     if (products) return render(products);
@@ -271,66 +282,81 @@ function App() {
 
   return (
     <div className="min-h-screen bg-canvas text-slate-800">
-      <Header cartCount={cartCount} wishlistCount={wishlist?.length ?? 0} openCart={openCart} user={user ?? null} products={products} />
       <Routes>
+        <Route path="/admin" element={requireAdmin((currentUser: User) => <AdminLayout user={currentUser} signOut={signOut} />)}>
+          <Route index element={withProducts((catalogue: Product[]) => <AdminDashboard products={catalogue} user={user as User} />)} />
+          <Route path="orders" element={<AdminOrdersPage />} />
+          <Route path="orders/:id" element={<AdminOrderPage notify={notify} stockChanged={loadProducts} />} />
+          <Route path="*" element={<AdminNotFound />} />
+        </Route>
+        {/* The store: its header, footer and WhatsApp button around every other page. */}
         <Route
-          path="/"
-          element={<HomePage {...shopActions} products={products} catalogueError={catalogueError} reloadProducts={loadProducts} />}
-        />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/products" element={withProducts((catalogue: Product[]) => <ProductsPage {...shopActions} products={catalogue} />)} />
-        <Route
-          path="/product/:id"
-          element={withProducts((catalogue: Product[]) => (
-            <ProductPage {...shopActions} products={catalogue} openCart={openCart} user={user} reloadProducts={loadProducts} />
-          ))}
-        />
-        <Route
-          path="/checkout"
-          element={requireUser((currentUser: User) =>
-            withProducts(() => (
-              <CheckoutPage
-                cart={cart}
-                cartTotal={cartTotal}
+          element={
+            <>
+              <Header cartCount={cartCount} wishlistCount={wishlist?.length ?? 0} openCart={openCart} user={user ?? null} products={products} />
+              <Outlet />
+              <Footer />
+              <WhatsAppButton />
+            </>
+          }
+        >
+          <Route
+            path="/"
+            element={<HomePage {...shopActions} products={products} catalogueError={catalogueError} reloadProducts={loadProducts} />}
+          />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/products" element={withProducts((catalogue: Product[]) => <ProductsPage {...shopActions} products={catalogue} />)} />
+          <Route
+            path="/product/:id"
+            element={withProducts((catalogue: Product[]) => (
+              <ProductPage {...shopActions} products={catalogue} openCart={openCart} user={user} reloadProducts={loadProducts} />
+            ))}
+          />
+          <Route
+            path="/checkout"
+            element={requireUser((currentUser: User) =>
+              withProducts(() => (
+                <CheckoutPage
+                  cart={cart}
+                  cartTotal={cartTotal}
+                  user={currentUser}
+                  savedDelivery={orders?.[0]?.delivery}
+                  setQuantity={setQuantity}
+                  placeOrder={placeOrder}
+                />
+              )),
+            )}
+          />
+          <Route path="/login" element={<LoginPage user={user} signIn={signIn} signInWithGoogle={signInWithGoogle} />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage resetPassword={resetPassword} />} />
+          <Route
+            path="/profile"
+            element={requireUser((currentUser: User) => (
+              <ProfilePage
                 user={currentUser}
-                savedDelivery={orders?.[0]?.delivery}
-                setQuantity={setQuantity}
-                placeOrder={placeOrder}
+                orders={orders ?? []}
+                signOut={signOut}
+                updatePreferences={updatePreferences}
+                saveName={saveName}
+                changePassword={changePassword}
               />
-            )),
-          )}
-        />
-        <Route path="/login" element={<LoginPage user={user} signIn={signIn} signInWithGoogle={signInWithGoogle} />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage resetPassword={resetPassword} />} />
-        <Route
-          path="/profile"
-          element={requireUser((currentUser: User) => (
-            <ProfilePage
-              user={currentUser}
-              orders={orders ?? []}
-              signOut={signOut}
-              updatePreferences={updatePreferences}
-              saveName={saveName}
-              changePassword={changePassword}
-            />
-          ))}
-        />
-        <Route
-          path="/wishlist"
-          element={requireUser(() =>
-            withProducts((catalogue: Product[]) => (
-              <WishlistPage {...shopActions} products={(wishlist ?? []).flatMap((id: number) => catalogue.filter((product: Product) => product.id === id))} />
-            )),
-          )}
-        />
-        <Route path="/orders" element={requireUser(() => <OrdersPage orders={orders ?? []} buyAgain={buyAgain} cancelOrder={cancelOrder} />)} />
-        <Route path="/orders/:id" element={requireUser(() => <OrderDetailsPage orders={orders ?? []} buyAgain={buyAgain} cancelOrder={cancelOrder} />)} />
-        <Route path="/policies/:slug" element={<PolicyPage />} />
-        <Route path="*" element={<NotFoundPage />} />
+            ))}
+          />
+          <Route
+            path="/wishlist"
+            element={requireUser(() =>
+              withProducts((catalogue: Product[]) => (
+                <WishlistPage {...shopActions} products={(wishlist ?? []).flatMap((id: number) => catalogue.filter((product: Product) => product.id === id))} />
+              )),
+            )}
+          />
+          <Route path="/orders" element={requireUser(() => <OrdersPage orders={orders ?? []} buyAgain={buyAgain} cancelOrder={cancelOrder} />)} />
+          <Route path="/orders/:id" element={requireUser(() => <OrderDetailsPage orders={orders ?? []} buyAgain={buyAgain} cancelOrder={cancelOrder} />)} />
+          <Route path="/policies/:slug" element={<PolicyPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
       </Routes>
-      <Footer />
-      <WhatsAppButton />
       {/* Above the WhatsApp button on phones, where a long message would reach it. */}
       <div aria-live="polite" className="print:hidden">
         {notice && (
