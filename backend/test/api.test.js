@@ -60,6 +60,13 @@ describe('without a database', () => {
     assert.equal((await call('/products/1/reviews', { method: 'PUT', body: { rating: 5 } })).status, 401);
   });
 
+  test('the admin API needs a session', async () => {
+    assert.equal((await call('/admin/summary')).status, 401);
+    assert.equal((await call('/admin/orders')).status, 401);
+    assert.equal((await call('/admin/orders/YE00000000')).status, 401);
+    assert.equal((await call('/admin/orders/YE00000000/status', { method: 'PUT', body: { status: 'Shipped' } })).status, 401);
+  });
+
   test('bad registration input is rejected before touching the database', async () => {
     const valid = { name: 'Test Customer', email: 'a@b.co', password: 'longenough' };
     for (const body of [{ ...valid, name: '  ' }, { ...valid, email: 'nope' }, { ...valid, password: '12345' }]) {
@@ -99,6 +106,7 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
   const email = `test-${stamp}@example.com`;
   const otherEmail = `test-${stamp}-other@example.com`;
   let cookie;
+  let buyer; // a second customer, whose orders the admin tests work on
   let firstOrder;
   let stockBefore; // the tests' orders change stock, so it is put back afterwards
 
@@ -319,6 +327,55 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
     assert.equal((await order(1)).status, 201);
     assert.equal((await call('/products/3')).body.product.stock, 0);
     assert.equal((await order(1)).body.error, 'Disposable Syringe without Needle, 2 ml is out of stock. Remove it from your cart to order the rest.');
+  });
+
+  test('only admins get the admin API, and the database flag is what makes one', async () => {
+    buyer = (await call('/auth/register', { method: 'POST', body: { name: 'Admin Test Buyer', email: `test-${stamp}-buyer@example.com`, password: 'buyer-password' } })).cookie;
+    assert.deepEqual((await call('/admin/summary', { cookie: buyer })).body, { error: 'This page is for YourEcom staff only.' });
+
+    await query('UPDATE users SET is_admin = TRUE WHERE email = ?', [email]);
+    assert.equal((await call('/me', { cookie })).body.user.isAdmin, true);
+    const { counts, today, last30Days } = (await call('/admin/summary', { cookie })).body;
+    assert.deepEqual(Object.keys(counts), ['Processing', 'Shipped', 'Delivered', 'Cancelled']);
+    assert.ok(Object.values(counts).every(Number.isInteger));
+    assert.ok(today.orders >= 1 && today.sales >= 998, 'this run’s orders count as today’s');
+    assert.ok(last30Days.orders >= today.orders && last30Days.sales >= today.sales);
+  });
+
+  test('admins find any customer’s order by number or phone, ship it with tracking, and cancel orders back into stock', async () => {
+    const place = async () => (await call('/orders', { method: 'POST', cookie: buyer, body: { items: [{ id: 6, quantity: 2 }], delivery: { ...delivery, phone: '+91 91234-56780' }, paymentMethod: 'cod' } })).body.order;
+    const shipped = await place();
+    const cancelled = await place();
+    const list = async filter => (await call(`/admin/orders${filter}`, { cookie })).body;
+    const ids = async filter => (await list(filter)).orders.map(order => order.id);
+
+    assert.deepEqual(await ids(`?q=${shipped.id.toLowerCase()}`), [shipped.id], 'by order number, in any case');
+    const byPhone = await list('?q=091234 56780');
+    assert.deepEqual(byPhone.orders.map(order => order.id), [cancelled.id, shipped.id], 'by phone however it’s typed, newest first');
+    assert.deepEqual([byPhone.total, byPhone.page, byPhone.pageSize], [2, 1, 20]);
+    assert.deepEqual(byPhone.orders[1], { ...shipped, customerName: 'Admin Test Buyer' });
+    assert.deepEqual(await ids('?q=admin%20test%20BUYER&status=Processing'), [shipped.id, cancelled.id], 'the queue to ship is oldest first');
+    assert.deepEqual(await ids('?q=9123456780&page=2'), []);
+    for (const filter of ['?status=Lost', '?page=0', '?page=x']) assert.equal((await call(`/admin/orders${filter}`, { cookie })).status, 400, filter);
+    assert.equal((await call('/admin/orders/YE00000000', { cookie })).status, 404);
+
+    const setStatus = (id, body) => call(`/admin/orders/${id}/status`, { method: 'PUT', cookie, body });
+    const ship = (await setStatus(shipped.id, { status: 'Shipped', tracking: '  DTDC D12345678 ' })).body.order;
+    assert.deepEqual([ship.status, ship.tracking], ['Shipped', 'DTDC D12345678']);
+    const seen = (await call(`/orders/${shipped.id}`, { cookie: buyer })).body.order;
+    assert.deepEqual([seen.status, seen.tracking], ['Shipped', 'DTDC D12345678'], 'the customer sees it shipped, with tracking');
+    assert.deepEqual((await call(`/orders/${shipped.id}/cancel`, { method: 'POST', cookie: buyer, body: {} })).body, { error: 'This order has already shipped, so it can’t be cancelled.' });
+    assert.equal((await setStatus(shipped.id, { status: 'Shipped', tracking: 'Blue Dart 98765' })).body.order.tracking, 'Blue Dart 98765', 'tracking can be corrected');
+    assert.equal((await setStatus(shipped.id, { status: 'Delivered' })).body.order.status, 'Delivered');
+    assert.equal((await setStatus(shipped.id, { status: 'Cancelled' })).status, 409, 'delivered is final');
+    assert.equal((await setStatus(shipped.id, { status: 'Processing' })).status, 400);
+    assert.equal((await setStatus('YE00000000', { status: 'Delivered' })).status, 404);
+
+    const stockOf = async id => (await call(`/products/${id}`)).body.product.stock;
+    const stock = await stockOf(6);
+    assert.equal((await setStatus(cancelled.id, { status: 'Cancelled' })).body.order.status, 'Cancelled');
+    assert.equal(await stockOf(6), stock + 2, 'cancelling puts the items back in stock');
+    assert.equal((await setStatus(cancelled.id, { status: 'Shipped' })).status, 409, 'cancelled is final');
   });
 
   test('only customers who ordered a product can review it, once each', async () => {

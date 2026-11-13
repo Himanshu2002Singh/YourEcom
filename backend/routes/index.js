@@ -1,6 +1,7 @@
 // Every API endpoint, mounted under /api by app.js.
 import { Router } from 'express';
 import { health } from '../controllers/health.controller.js';
+import adminRoutes from './admin.routes.js';
 import authRoutes from './auth.routes.js';
 import couponRoutes from './coupon.routes.js';
 import meRoutes from './me.routes.js';
@@ -17,5 +18,6 @@ router.use('/products', productRoutes);
 router.use('/orders', orderRoutes);
 router.use('/coupons', couponRoutes);
 router.use('/wishlist', wishlistRoutes);
+router.use('/admin', adminRoutes);
 
 export default router;

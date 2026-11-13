@@ -2,9 +2,16 @@
 import { randomInt } from 'node:crypto';
 import { query, transaction } from '../db/pool.js';
 import { HttpError } from '../utils/HttpError.js';
+import { STATUSES } from '../validators/order.validator.js';
 import * as Coupon from './coupon.model.js';
 
 const isDuplicate = error => error?.code === 'ER_DUP_ENTRY';
+
+// For the admin pages: orders with the name and email of the account that placed them.
+const WITH_CUSTOMER = 'SELECT orders.*, users.name AS customer_name, users.email AS customer_email FROM orders JOIN users ON users.id = orders.user_id';
+
+// LIKE matches `text` anywhere, with % and _ in it as plain characters.
+const containing = text => `%${text.replace(/[\\%_]/g, '\\$&')}%`;
 
 // Order numbers look like YE12345678: 'YE' and 8 random digits.
 const orderNumber = () => `YE${String(randomInt(1e8)).padStart(8, '0')}`;
@@ -56,6 +63,12 @@ export async function listForUser(userId, status) {
     : query('SELECT * FROM orders WHERE user_id = ? ORDER BY placed_at DESC', [userId]);
 }
 
+// Marks an order Cancelled and puts its items back in stock, inside a transaction that has locked its row.
+async function cancelLocked(connection, id, items) {
+  await connection.execute("UPDATE orders SET status = 'Cancelled' WHERE id = ?", [id]);
+  for (const { id: productId, quantity } of items) await connection.execute('UPDATE products SET stock = stock + ? WHERE id = ?', [quantity, productId]);
+}
+
 // Cancels one of the customer's orders and puts its items back in stock. Only an order that
 // is still Processing can be cancelled.
 export async function cancelForUser(userId, id) {
@@ -64,8 +77,7 @@ export async function cancelForUser(userId, id) {
     if (!order) throw new HttpError(404, 'Order not found.');
     if (order.status === 'Cancelled') throw new HttpError(409, 'This order is already cancelled.');
     if (order.status !== 'Processing') throw new HttpError(409, `This order has already ${order.status === 'Shipped' ? 'shipped' : 'been delivered'}, so it can’t be cancelled.`);
-    await connection.execute("UPDATE orders SET status = 'Cancelled' WHERE id = ?", [id]);
-    for (const { id: productId, quantity } of order.items) await connection.execute('UPDATE products SET stock = stock + ? WHERE id = ?', [quantity, productId]);
+    await cancelLocked(connection, id, order.items);
   });
   return findForUser(userId, id);
 }
@@ -73,4 +85,67 @@ export async function cancelForUser(userId, id) {
 // One of the customer's orders, or null (also when it is someone else's).
 export async function findForUser(userId, id) {
   return (await query('SELECT * FROM orders WHERE id = ? AND user_id = ?', [id, userId]))[0] ?? null;
+}
+
+// Any customer's order, with its customer (WITH_CUSTOMER), or null. For the admin pages.
+export async function findById(id) {
+  return (await query(`${WITH_CUSTOMER} WHERE orders.id = ?`, [id]))[0] ?? null;
+}
+
+// One page of every customer's orders, for the admin pages (validators/admin.validator.js cleans the filter).
+// With `status`, only those: Processing ones oldest first, as the queue to pack and ship, the rest newest first.
+// With `search`, those whose number, customer name or email, delivery name, city or pincode contains it, or
+// whose phone does when the search is a number however it is spaced. Answers { rows, total }.
+export async function listAll({ status, search, page, pageSize }) {
+  const where = [];
+  const params = [];
+  if (status) {
+    where.push('orders.status = ?');
+    params.push(status);
+  }
+  if (search) {
+    // The delivery details are JSON, whose text compares case-sensitively, so both sides are lower-cased.
+    const fields = ['orders.id', 'users.name', 'users.email', "orders.delivery->>'$.name'", "orders.delivery->>'$.city'", "orders.delivery->>'$.pincode'"];
+    const matches = fields.map(field => `LOWER(${field}) LIKE ?`);
+    params.push(...fields.map(() => containing(search.toLowerCase())));
+    const digits = /^[\d\s()+-]+$/.test(search) ? search.replace(/\D/g, '').slice(-10) : '';
+    if (digits) {
+      matches.push("REGEXP_REPLACE(orders.delivery->>'$.phone', '[^0-9]', '') LIKE ?");
+      params.push(containing(digits));
+    }
+    where.push(`(${matches.join(' OR ')})`);
+  }
+  const filter = where.length ? ` WHERE ${where.join(' AND ')}` : '';
+  // page and pageSize are whole numbers (validators/admin.validator.js), so they go into the SQL as they are.
+  const [rows, [{ total }]] = await Promise.all([
+    query(`${WITH_CUSTOMER}${filter} ORDER BY orders.placed_at ${status === 'Processing' ? 'ASC' : 'DESC'} LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`, params),
+    query(`SELECT COUNT(*) AS total FROM orders JOIN users ON users.id = orders.user_id${filter}`, params),
+  ]);
+  return { rows, total: Number(total) };
+}
+
+// How many orders are in each status: { Processing, Shipped, Delivered, Cancelled }.
+export async function countByStatus() {
+  const rows = await query('SELECT status, COUNT(*) AS count FROM orders GROUP BY status');
+  return Object.fromEntries(STATUSES.map(status => [status, Number(rows.find(row => row.status === status)?.count ?? 0)]));
+}
+
+// The orders placed since `since` (a Date) that weren't cancelled: { orders, sales }, sales being their totals.
+export async function salesSince(since) {
+  const [{ orders, sales }] = await query("SELECT COUNT(*) AS orders, COALESCE(SUM(total), 0) AS sales FROM orders WHERE placed_at >= ? AND status <> 'Cancelled'", [since]);
+  return { orders: Number(orders), sales: Number(sales) };
+}
+
+// An admin moves an order on: to Shipped with its courier and tracking number (which can be changed while it's
+// Shipped), to Delivered, or to Cancelled, which puts its items back in stock. Delivered and Cancelled are final.
+export async function setStatus(id, { status, tracking }) {
+  await transaction(async connection => {
+    const [[order]] = await connection.execute('SELECT status, items FROM orders WHERE id = ? FOR UPDATE', [id]);
+    if (!order) throw new HttpError(404, 'Order not found.');
+    if (order.status === 'Delivered' || order.status === 'Cancelled') throw new HttpError(409, `This order is already ${order.status.toLowerCase()}, so it can’t be changed.`);
+    if (status === 'Cancelled') await cancelLocked(connection, id, order.items);
+    else if (status === 'Shipped') await connection.execute("UPDATE orders SET status = 'Shipped', tracking = ? WHERE id = ?", [tracking, id]);
+    else await connection.execute("UPDATE orders SET status = 'Delivered' WHERE id = ?", [id]);
+  });
+  return findById(id);
 }

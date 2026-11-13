@@ -5,6 +5,7 @@ import { before, test } from 'node:test';
 import { deliveryFeeFor, discountFor } from '../services/pricing.service.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
 import { readSession, startSession } from '../utils/session.js';
+import { cleanOrderQuery, cleanStatusChange } from '../validators/admin.validator.js';
 import { MAX_QUANTITY, cleanCouponCode, cleanOrder, cleanStatus } from '../validators/order.validator.js';
 
 before(() => {
@@ -67,6 +68,18 @@ test('the order status filter is optional and only Processing, Shipped, Delivere
   assert.equal(cleanStatus('Delivered'), 'Delivered');
   assert.equal(cleanStatus('Cancelled'), 'Cancelled');
   assert.throws(() => cleanStatus('delivered'), { status: 400 });
+});
+
+test('admins move orders on to Shipped (with tracking), Delivered or Cancelled, and nothing else', () => {
+  assert.deepEqual(cleanStatusChange({ status: 'Shipped', tracking: ' DTDC 123 ' }), { status: 'Shipped', tracking: 'DTDC 123' });
+  assert.deepEqual(cleanStatusChange({ status: 'Shipped', tracking: ' ' }), { status: 'Shipped', tracking: null });
+  assert.deepEqual(cleanStatusChange({ status: 'Delivered', tracking: 'DTDC 123' }), { status: 'Delivered', tracking: null }, 'tracking only goes with Shipped');
+  for (const body of [{ status: 'Processing' }, { status: 'shipped' }, {}, null, { status: 'Shipped', tracking: 'x'.repeat(201) }]) {
+    assert.throws(() => cleanStatusChange(body), { status: 400 }, JSON.stringify(body));
+  }
+  assert.deepEqual(cleanOrderQuery({}), { status: null, search: '', page: 1, pageSize: 20 });
+  assert.deepEqual(cleanOrderQuery({ status: 'Shipped', q: ' 98765 ', page: '3' }), { status: 'Shipped', search: '98765', page: 3, pageSize: 20 });
+  for (const page of ['0', '-1', '1.5', 'x', ['1', '2']]) assert.throws(() => cleanOrderQuery({ page }), { status: 400 }, String(page));
 });
 
 test('passwords are hashed with a salt and verified', async () => {

@@ -22,3 +22,9 @@ export function orderView(row, user) {
     tracking: row.tracking,
   };
 }
+
+// For the admin pages (frontend AdminOrder): the same, with the name on the account that placed it. The row
+// comes from models/order.model.js's admin queries, which add customer_name and customer_email.
+export function adminOrderView(row) {
+  return { ...orderView(row, { email: row.customer_email }), customerName: row.customer_name };
+}

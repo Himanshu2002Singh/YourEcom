@@ -57,7 +57,7 @@ export function cleanOrder(body) {
   return order;
 }
 
-// The optional ?status= filter of GET /api/orders.
+// The optional ?status= filter of GET /api/orders and GET /api/admin/orders.
 export function cleanStatus(status = '') {
   if (status && !STATUSES.includes(status)) throw new HttpError(400, `Status must be ${STATUSES.slice(0, -1).join(', ')} or ${STATUSES.at(-1)}.`);
   return status || null;
