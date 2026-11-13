@@ -18,9 +18,11 @@ const stepStyles: Record<Step['state'], string> = {
   cancelled: 'bg-rose-100 text-rose-600',
 };
 
-// Placed, then Processing until it is Delivered; or Cancelled.
+// Placed, packing (Processing), Shipped with its tracking, then Delivered; or Cancelled. An order handed over in
+// person goes from Processing straight to Delivered.
 function OrderProgress({ order }: { order: Order }) {
-  const delivered = order.status === 'Delivered';
+  const stage = ['Processing', 'Shipped', 'Delivered'].indexOf(order.status); // 0 packing, 1 shipped, 2 delivered
+  const stateAt = (step: number): Step['state'] => (stage > step ? 'done' : stage === step ? 'current' : 'upcoming');
   const steps: Step[] =
     order.status === 'Cancelled'
       ? [
@@ -29,8 +31,9 @@ function OrderProgress({ order }: { order: Order }) {
         ]
       : [
           { label: 'Order placed', detail: formatDateTime(order.placedAt), state: 'done' },
-          { label: 'Packing and shipping', detail: delivered ? undefined : 'Ships in 1–2 days', state: delivered ? 'done' : 'current' },
-          { label: 'Delivered', state: delivered ? 'done' : 'upcoming' },
+          { label: 'Packing', detail: stage === 0 ? 'Ships in 1–2 days' : undefined, state: stateAt(0) },
+          { label: 'Shipped', detail: order.tracking ?? undefined, state: stateAt(1) },
+          { label: 'Delivered', state: stage === 2 ? 'done' : 'upcoming' },
         ];
 
   return (

@@ -10,6 +10,7 @@ export const paymentLabels: Record<PaymentMethod, string> = { online: 'Card / UP
 
 export const deliveryLabels: Record<OrderStatus, string> = {
   Processing: 'Delivering to',
+  Shipped: 'On its way to',
   Delivered: 'Delivered to',
   Cancelled: 'Was to be delivered to',
 };

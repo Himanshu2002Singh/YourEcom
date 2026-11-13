@@ -50,7 +50,7 @@ export type Coupon = {
 
 export type DeliveryDetails = { name: string; phone: string; address: string; city: string; pincode: string };
 export type PaymentMethod = 'online' | 'cod';
-export type OrderStatus = 'Processing' | 'Delivered' | 'Cancelled';
+export type OrderStatus = 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
 
 export type Order = {
   id: string;
@@ -65,4 +65,5 @@ export type Order = {
   delivery: DeliveryDetails;
   paymentMethod: PaymentMethod;
   status: OrderStatus;
+  tracking: string | null; // courier and tracking number, once it ships
 };

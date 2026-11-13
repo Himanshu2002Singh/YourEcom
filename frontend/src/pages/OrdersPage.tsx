@@ -5,19 +5,21 @@ import { OrderActions, OrderItemList, StatusPill } from '@/components/OrderParts
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { deliveryLabels, formatDate, paymentLabels } from '@/lib/format';
 import { formatPrice } from '@/lib/pricing';
-import type { Order, OrderStatus } from '@/types/store';
+import type { Order } from '@/types/store';
 
 type OrdersPageProps = { orders: Order[]; buyAgain: (order: Order) => void; cancelOrder: (id: string) => Promise<void> };
-type Filter = 'all' | OrderStatus;
+type Filter = 'all' | 'active' | 'Delivered' | 'Cancelled';
 
 const filters: [Filter, string][] = [
   ['all', 'All orders'],
-  ['Processing', 'In progress'],
+  ['active', 'In progress'],
   ['Delivered', 'Delivered'],
   ['Cancelled', 'Cancelled'],
 ];
 
-const matchesFilter = (order: Order, filter: Filter): boolean => filter === 'all' || order.status === filter;
+// In progress is everything not yet delivered or cancelled: being packed, or shipped.
+const matchesFilter = (order: Order, filter: Filter): boolean =>
+  filter === 'all' || (filter === 'active' ? order.status === 'Processing' || order.status === 'Shipped' : order.status === filter);
 
 export function OrdersPage({ orders, buyAgain, cancelOrder }: OrdersPageProps) {
   const [filter, setFilter] = useState<Filter>('all');
@@ -83,6 +85,7 @@ export function OrdersPage({ orders, buyAgain, cancelOrder }: OrdersPageProps) {
                 <p className="flex items-center gap-2 text-sm font-semibold text-slate-500">
                   <Truck size={16} className="shrink-0 text-brand" />
                   {deliveryLabels[order.status]} {order.delivery.name}, {order.delivery.city}
+                  {order.status === 'Shipped' && order.tracking && ` · ${order.tracking}`}
                 </p>
                 <div className="flex shrink-0 flex-wrap gap-2 self-start sm:self-auto">
                   <OrderActions order={order} buyAgain={buyAgain} cancelOrder={cancelOrder} />

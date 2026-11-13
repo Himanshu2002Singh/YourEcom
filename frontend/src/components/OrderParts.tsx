@@ -6,6 +6,7 @@ import type { Order, OrderItem, OrderStatus } from '@/types/store';
 
 const statusStyles: Record<OrderStatus, string> = {
   Processing: 'bg-brand-soft text-brand',
+  Shipped: 'bg-amber-50 text-amber-700',
   Delivered: 'bg-emerald-50 text-leaf',
   Cancelled: 'bg-slate-100 text-slate-500',
 };
