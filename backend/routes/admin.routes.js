@@ -10,5 +10,6 @@ router.get('/summary', admin.getSummary);
 router.get('/orders', admin.listOrders);
 router.get('/orders/:id', admin.getOrder);
 router.put('/orders/:id/status', admin.setOrderStatus);
+router.put('/products/:id', admin.updateProduct);
 
 export default router;

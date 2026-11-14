@@ -65,6 +65,7 @@ describe('without a database', () => {
     assert.equal((await call('/admin/orders')).status, 401);
     assert.equal((await call('/admin/orders/YE00000000')).status, 401);
     assert.equal((await call('/admin/orders/YE00000000/status', { method: 'PUT', body: { status: 'Shipped' } })).status, 401);
+    assert.equal((await call('/admin/products/1', { method: 'PUT', body: {} })).status, 401);
   });
 
   test('bad registration input is rejected before touching the database', async () => {
@@ -332,6 +333,7 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
   test('only admins get the admin API, and the database flag is what makes one', async () => {
     buyer = (await call('/auth/register', { method: 'POST', body: { name: 'Admin Test Buyer', email: `test-${stamp}-buyer@example.com`, password: 'buyer-password' } })).cookie;
     assert.deepEqual((await call('/admin/summary', { cookie: buyer })).body, { error: 'This page is for YourEcom staff only.' });
+    assert.equal((await call('/admin/products/4', { method: 'PUT', cookie: buyer, body: {} })).status, 403);
 
     await query('UPDATE users SET is_admin = TRUE WHERE email = ?', [email]);
     assert.equal((await call('/me', { cookie })).body.user.isAdmin, true);
@@ -376,6 +378,43 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
     assert.equal((await setStatus(cancelled.id, { status: 'Cancelled' })).body.order.status, 'Cancelled');
     assert.equal(await stockOf(6), stock + 2, 'cancelling puts the items back in stock');
     assert.equal((await setStatus(cancelled.id, { status: 'Shipped' })).status, 409, 'cancelled is final');
+  });
+
+  // A product as the admin pages' form sends it: every field, photos main first.
+  const formFor = product => ({
+    name: product.name, category: product.category, family: product.family ?? '', variant: product.variant ?? '', price: product.price, mrp: product.mrp, stock: product.stock,
+    unit: product.unit, badge: product.badge ?? '', description: product.description, photos: [product.image, ...product.gallery], features: product.features, specs: product.specs,
+  });
+
+  test('admins edit every part of a product, and the store shows it at once', async () => {
+    const [original] = await query('SELECT * FROM products WHERE id = 4');
+    const { product: before } = (await call('/products/4')).body;
+    const save = (id, body) => call(`/admin/products/${id}`, { method: 'PUT', cookie, body });
+    try {
+      assert.deepEqual((await save(4, formFor(before))).body.product, before, 'saving the form unchanged changes nothing');
+      const changes = {
+        ...formFor(before), name: ' IV Infusion Set, Vented ', family: 'IV Infusion Set', variant: 'Vented', price: 850, mrp: 999, stock: 40, unit: ' Pack of 10 sets ', badge: ' ',
+        description: ' A new description. ', photos: ['/photos/test-main.jpg', before.image], features: [' Vented spike ', ''], specs: [['Tube', ' 150 cm '], ['', '']],
+      };
+      const saved = await save(4, changes);
+      assert.equal(saved.status, 200);
+      const { product } = (await call('/products/4')).body;
+      assert.deepEqual(saved.body.product, product);
+      const withoutReviews = ({ rating, reviewCount, ...rest }) => rest;
+      const { badge, ...unbadged } = withoutReviews(before);
+      assert.deepEqual(withoutReviews(product), {
+        ...unbadged, name: 'IV Infusion Set, Vented', family: 'IV Infusion Set', variant: 'Vented', price: 850, mrp: 999, stock: 40, unit: 'Pack of 10 sets',
+        description: 'A new description.', image: '/photos/test-main.jpg', gallery: [before.image], features: ['Vented spike'], specs: [['Tube', '150 cm']],
+      }, `an empty badge (was ${badge}) is none`);
+      for (const change of [{ price: 0 }, { mrp: 849 }, { stock: '40' }, { name: '' }, { category: 'Toys' }, { variant: '' }, { photos: [] }, { photos: ['https://example.com/x.jpg'] }, { features: [] }]) {
+        assert.equal((await save(4, { ...changes, ...change })).status, 400, JSON.stringify(change));
+      }
+      assert.equal((await save(999, changes)).status, 404);
+    } finally {
+      const columns = ['name', 'category', 'family', 'variant', 'price', 'mrp', 'unit', 'stock', 'badge', 'image', 'gallery', 'description', 'features', 'specs'];
+      const json = column => (['gallery', 'features', 'specs'].includes(column) && original[column] !== null ? JSON.stringify(original[column]) : original[column]);
+      await query(`UPDATE products SET ${columns.map(column => `${column} = ?`).join(', ')} WHERE id = 4`, columns.map(json));
+    }
   });
 
   test('only customers who ordered a product can review it, once each', async () => {

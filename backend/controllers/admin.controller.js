@@ -1,9 +1,11 @@
-// /api/admin — the store's own pages: the orders to ship and sales.
+// /api/admin — the store's own pages: the orders to ship, sales, and the catalogue.
 // Every route is for admins only (routes/admin.routes.js).
 import * as Order from '../models/order.model.js';
+import * as Product from '../models/product.model.js';
 import { HttpError } from '../utils/HttpError.js';
-import { cleanOrderQuery, cleanStatusChange } from '../validators/admin.validator.js';
+import { cleanOrderQuery, cleanProduct, cleanStatusChange } from '../validators/admin.validator.js';
 import { adminOrderView } from '../views/order.view.js';
+import { productView } from '../views/product.view.js';
 
 const DAY = 864e5;
 const IST = 330 * 60_000; // the store's day runs midnight to midnight in India (UTC+5:30)
@@ -42,4 +44,11 @@ export async function getOrder(request, response) {
 export async function setOrderStatus(request, response) {
   const order = await Order.setStatus(request.params.id, cleanStatusChange(request.body));
   response.json({ order: adminOrderView(order) });
+}
+
+// PUT /api/admin/products/:id — the whole product, as the product form sends it. The store shows it at once.
+export async function updateProduct(request, response) {
+  const product = cleanProduct(request.body);
+  const { id } = await Product.findFromParam(request.params.id);
+  response.json({ product: productView(await Product.update(id, product)) });
 }

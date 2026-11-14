@@ -77,9 +77,10 @@ DEALLOCATE PREPARE add_specs;
 -- price a piece times the pack size; "Minimum order" is the listing's wholesale minimum. Their MRP is only one
 -- printed on the pack (J.K. Diagnostics tubes). IV cannula is ₹4–8 a piece, as the client quoted. Everything
 -- else, MRPs included (except the infusion set's printed ₹250 each), is a placeholder until the price list.
--- There is no admin screen yet, so this list is the catalogue: every start writes it over the rows with the
--- same id. Stock is left alone, because orders and cancellations change it.
-INSERT INTO products (id, name, category, family, variant, price, mrp, unit, stock, badge, image, gallery, description, features, specs) VALUES
+-- This list is only the starting catalogue: each start adds the rows whose id is missing and leaves existing
+-- rows alone, because the admin pages (/admin/products) now own every product. Change or add products there;
+-- a change here only reaches a new database, and a new row here is skipped where its id is already taken.
+INSERT IGNORE INTO products (id, name, category, family, variant, price, mrp, unit, stock, badge, image, gallery, description, features, specs) VALUES
   (1, 'Magnum 3-Ply Surgical Mask, ISI Marked, Class 2', 'Face Masks', 'Magnum 3-Ply Surgical Mask, ISI Marked', 'Class 2', 75, NULL, 'Box of 50', 240, 'ISI marked',
    '/photos/mask-isi-class2.jpg', '["/photos/kit-isi-mask.jpg", "/photos/magnum-mask-carton.jpg", "/photos/mask-magnum-1.jpg"]',
    'The Magnum Face Mask (Class 1, 2, and 3) is a high-quality 3-ply disposable mask designed for effective protection against airborne particles, dust, and contaminants. These masks provide varying levels of filtration and breathability, ensuring safety and comfort for different environments, from general use to medical and industrial settings.',
@@ -434,11 +435,7 @@ INSERT INTO products (id, name, category, family, variant, price, mrp, unit, sto
    '/photos/urine-container-30ml-ns-1.jpg', '[]',
    'Non-sterile 30 ml plastic urine containers with a leak-proof screw cap and a label for patient details, packed 100 to a pack.',
    '["30 ml, leak-proof cap", "With label", "Non-sterile"]',
-   '[["Capacity", "30 ml"], ["Cap", "Leak-proof"], ["Label", "Yes"], ["Sterile", "No"], ["Preservative", "Yes"]]')
-AS seed ON DUPLICATE KEY UPDATE
-  name = seed.name, category = seed.category, family = seed.family, variant = seed.variant, price = seed.price, mrp = seed.mrp,
-  unit = seed.unit, badge = seed.badge, image = seed.image, gallery = seed.gallery, description = seed.description, features = seed.features,
-  specs = seed.specs;
+   '[["Capacity", "30 ml"], ["Cap", "Leak-proof"], ["Label", "Yes"], ["Sterile", "No"], ["Preservative", "Yes"]]');
 
 -- What a customer bought. Items and totals are copied when the order is placed, so later
 -- price changes never rewrite an old order.

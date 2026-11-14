@@ -5,7 +5,7 @@ import { before, test } from 'node:test';
 import { deliveryFeeFor, discountFor } from '../services/pricing.service.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
 import { readSession, startSession } from '../utils/session.js';
-import { cleanOrderQuery, cleanStatusChange } from '../validators/admin.validator.js';
+import { cleanOrderQuery, cleanProduct, cleanStatusChange } from '../validators/admin.validator.js';
 import { MAX_QUANTITY, cleanCouponCode, cleanOrder, cleanStatus } from '../validators/order.validator.js';
 
 before(() => {
@@ -80,6 +80,26 @@ test('admins move orders on to Shipped (with tracking), Delivered or Cancelled, 
   assert.deepEqual(cleanOrderQuery({}), { status: null, search: '', page: 1, pageSize: 20 });
   assert.deepEqual(cleanOrderQuery({ status: 'Shipped', q: ' 98765 ', page: '3' }), { status: 'Shipped', search: '98765', page: 3, pageSize: 20 });
   for (const page of ['0', '-1', '1.5', 'x', ['1', '2']]) assert.throws(() => cleanOrderQuery({ page }), { status: 400 }, String(page));
+});
+
+test('a product needs a name, category, price no higher than its MRP, pack, description, a photo and a highlight', () => {
+  const product = {
+    name: ' Syringe, 2 ml ', category: 'Syringes', family: ' Syringe ', variant: ' 2 ml ', price: 280, mrp: 500, stock: 0, unit: ' Box of 100 ', badge: '',
+    description: ' Sterile. ', photos: ['/photos/syringe-2ml.jpg', '/photos/syringe-2ml-side.jpg'], features: [' Sterile ', ''], specs: [[' Needle ', ' None '], ['', '']],
+  };
+  assert.deepEqual(cleanProduct(product), {
+    name: 'Syringe, 2 ml', category: 'Syringes', family: 'Syringe', variant: '2 ml', price: 280, mrp: 500, stock: 0, unit: 'Box of 100', badge: null,
+    description: 'Sterile.', image: '/photos/syringe-2ml.jpg', gallery: ['/photos/syringe-2ml-side.jpg'], features: ['Sterile'], specs: [['Needle', 'None']],
+  });
+  assert.equal(cleanProduct({ ...product, mrp: 280 }).mrp, 280, 'MRP may equal the price');
+  assert.equal(cleanProduct({ ...product, mrp: null }).mrp, null);
+  assert.deepEqual(Object.values(cleanProduct({ ...product, family: ' ', variant: '' })).slice(2, 4), [null, null], 'a product in one size has neither');
+  const invalid = [
+    { name: ' ' }, { category: 'Toys' }, { variant: '' }, { price: 0 }, { price: '280' }, { mrp: 279 }, { mrp: undefined }, { stock: -1 }, { stock: 0.5 },
+    { unit: '' }, { description: '  ' }, { badge: 'x'.repeat(41) }, { photos: [] }, { photos: ['https://example.com/x.jpg'] }, { photos: ['/photos/../../.env'] },
+    { photos: ['/photos/a.svg'] }, { photos: ['/photos/a.jpg', '/photos/a.jpg'] }, { features: [' '] }, { features: 'Sterile' }, { specs: [['Needle', '']] },
+  ];
+  for (const change of invalid) assert.throws(() => cleanProduct({ ...product, ...change }), { status: 400 }, JSON.stringify(change));
 });
 
 test('passwords are hashed with a salt and verified', async () => {

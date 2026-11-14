@@ -1,4 +1,4 @@
-// The products table: the catalogue the storefront sells (seeded by db/schema.js).
+// The products table: the catalogue the storefront sells (seeded by db/schema.js, then run from the admin pages).
 import { query } from '../db/pool.js';
 import { HttpError } from '../utils/HttpError.js';
 
@@ -35,6 +35,17 @@ export async function findFromParam(id) {
   const product = /^[1-9]\d{0,8}$/.test(id) ? await findById(Number(id)) : null;
   if (!product) throw new HttpError(404, 'Product not found.');
   return product;
+}
+
+// What the admin pages write: every column but id (validators/admin.validator.js cleans them). Lists are JSON.
+const COLUMNS = ['name', 'category', 'family', 'variant', 'price', 'mrp', 'unit', 'stock', 'badge', 'image', 'gallery', 'description', 'features', 'specs'];
+const LISTS = new Set(['gallery', 'features', 'specs']);
+const values = product => COLUMNS.map(column => (LISTS.has(column) ? JSON.stringify(product[column]) : product[column]));
+
+// Saves the admin's version of a product that exists, every field at once. Answers the product as it is now.
+export async function update(id, product) {
+  await query(`UPDATE products SET ${COLUMNS.map(column => `${column} = ?`).join(', ')} WHERE id = ?`, [...values(product), id]);
+  return findById(id);
 }
 
 export async function findByIds(ids) {
