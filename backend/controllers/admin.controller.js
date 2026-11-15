@@ -47,6 +47,11 @@ export async function setOrderStatus(request, response) {
   response.json({ order: adminOrderView(order) });
 }
 
+// POST /api/admin/products — a new product (validators/admin.validator.js cleanProduct), in the store at once.
+export async function createProduct(request, response) {
+  response.status(201).json({ product: productView(await Product.create(cleanProduct(request.body))) });
+}
+
 // PUT /api/admin/products/:id — the whole product, as the product form sends it. The store shows it at once.
 export async function updateProduct(request, response) {
   const product = cleanProduct(request.body);

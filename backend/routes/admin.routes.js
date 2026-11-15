@@ -16,6 +16,7 @@ router.get('/summary', admin.getSummary);
 router.get('/orders', admin.listOrders);
 router.get('/orders/:id', admin.getOrder);
 router.put('/orders/:id/status', admin.setOrderStatus);
+router.post('/products', admin.createProduct);
 router.put('/products/:id', admin.updateProduct);
 router.post('/uploads', photos.array('photos', MAX_PHOTOS_PER_UPLOAD), admin.uploadPhotos);
 

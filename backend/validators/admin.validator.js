@@ -51,7 +51,7 @@ function cleanSpecs(specs) {
   return rows;
 }
 
-// PUT /api/admin/products/:id: the whole product, as the product form sends it. Sizes of one product share
+// POST and PUT /api/admin/products: the whole product, as the product form sends it. Sizes of one product share
 // a family (the name the storefront shows for them) and each has its own variant; a product in one size has
 // neither. `photos` lists its photo URLs, main photo first. mrp is null when the pack has none, and may not be
 // below the price, because nothing may be sold above its MRP. An empty badge is null.

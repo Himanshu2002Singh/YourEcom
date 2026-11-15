@@ -69,6 +69,7 @@ describe('without a database', () => {
     assert.equal((await call('/admin/orders/YE00000000')).status, 401);
     assert.equal((await call('/admin/orders/YE00000000/status', { method: 'PUT', body: { status: 'Shipped' } })).status, 401);
     assert.equal((await call('/admin/products/1', { method: 'PUT', body: {} })).status, 401);
+    assert.equal((await call('/admin/products', { method: 'POST', body: {} })).status, 401);
     assert.equal((await call('/admin/uploads', { method: 'POST', body: {} })).status, 401);
   });
 
@@ -427,7 +428,7 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
     }
   });
 
-  test('admins upload photos, which must really be JPEG, PNG or WebP', async () => {
+  test('admins upload photos and add products, numbered after the highest id', async () => {
     const png = Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), Buffer.from('test photo')]);
     const upload = (files, { as = cookie, header = true } = {}) => {
       const form = new FormData();
@@ -436,6 +437,7 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
       return fetch(`${base}/admin/uploads`, { method: 'POST', headers, body: form }).then(async response => ({ status: response.status, body: await response.json() }));
     };
     const uploaded = await upload([['front.png', png], ['back.PNG', png]]);
+    const added = [];
     try {
       assert.equal(uploaded.status, 201);
       assert.equal(uploaded.body.urls.length, 2);
@@ -449,7 +451,22 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
       assert.equal((await upload(Array.from({ length: 9 }, (_, index) => [`p${index}.png`, png]))).status, 400, 'up to 8 at a time');
       assert.equal((await upload([['front.png', png]], { header: false })).status, 415);
       assert.equal((await upload([['front.png', png]], { as: buyer })).status, 403);
+
+      const [{ highest }] = await query('SELECT MAX(id) AS highest FROM products');
+      const product = {
+        name: 'Test Specimen Bag', category: 'Lab Disposables', family: '', variant: '', price: 120, mrp: null, stock: 25, unit: 'Pack of 100', badge: 'New',
+        description: 'Zip-lock specimen bags.', photos: uploaded.body.urls, features: ['Zip lock'], specs: [],
+      };
+      const created = await call('/admin/products', { method: 'POST', cookie, body: product });
+      added.push(created.body.product?.id);
+      assert.equal(created.status, 201);
+      assert.equal(created.body.product.id, highest + 1);
+      assert.deepEqual(formFor(created.body.product), product);
+      assert.deepEqual((await call(`/products/${highest + 1}`)).body.product, created.body.product, 'in the store at once');
+      assert.equal((await call('/admin/products', { method: 'POST', cookie, body: { ...product, photos: [] } })).status, 400);
+      assert.equal((await call('/admin/products', { method: 'POST', cookie: buyer, body: product })).status, 403);
     } finally {
+      for (const id of added.filter(Boolean)) await query('DELETE FROM products WHERE id = ?', [id]);
       for (const url of uploaded.body.urls ?? []) await rm(path.join(UPLOAD_DIR, path.basename(url)), { force: true });
     }
   });

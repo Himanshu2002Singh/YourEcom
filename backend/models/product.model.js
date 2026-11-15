@@ -1,5 +1,5 @@
 // The products table: the catalogue the storefront sells (seeded by db/schema.js, then run from the admin pages).
-import { query } from '../db/pool.js';
+import { query, transaction } from '../db/pool.js';
 import { HttpError } from '../utils/HttpError.js';
 
 // Products with their review summary: rating (the average, NULL with no reviews) and review_count.
@@ -41,6 +41,17 @@ export async function findFromParam(id) {
 const COLUMNS = ['name', 'category', 'family', 'variant', 'price', 'mrp', 'unit', 'stock', 'badge', 'image', 'gallery', 'description', 'features', 'specs'];
 const LISTS = new Set(['gallery', 'features', 'specs']);
 const values = product => COLUMNS.map(column => (LISTS.has(column) ? JSON.stringify(product[column]) : product[column]));
+
+// A new product from the admin pages, numbered after the highest id. Locking the highest row first means
+// two products added at once get different numbers. Answers the product as the storefront sees it.
+export async function create(product) {
+  const id = await transaction(async connection => {
+    const [[{ next }]] = await connection.query('SELECT COALESCE(MAX(id), 0) + 1 AS next FROM products FOR UPDATE');
+    await connection.execute(`INSERT INTO products (id, ${COLUMNS.join(', ')}) VALUES (?, ${COLUMNS.map(() => '?').join(', ')})`, [next, ...values(product)]);
+    return next;
+  });
+  return findById(id);
+}
 
 // Saves the admin's version of a product that exists, every field at once. Answers the product as it is now.
 export async function update(id, product) {
