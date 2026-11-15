@@ -1,8 +1,9 @@
-// /api/admin — the store's own pages: the orders to ship, sales, and the catalogue.
+// /api/admin — the store's own pages: the orders to ship, sales, and the catalogue with its photos.
 // Every route is for admins only (routes/admin.routes.js).
 import * as Order from '../models/order.model.js';
 import * as Product from '../models/product.model.js';
 import { HttpError } from '../utils/HttpError.js';
+import { savePhotos } from '../utils/uploads.js';
 import { cleanOrderQuery, cleanProduct, cleanStatusChange } from '../validators/admin.validator.js';
 import { adminOrderView } from '../views/order.view.js';
 import { productView } from '../views/product.view.js';
@@ -51,4 +52,9 @@ export async function updateProduct(request, response) {
   const product = cleanProduct(request.body);
   const { id } = await Product.findFromParam(request.params.id);
   response.json({ product: productView(await Product.update(id, product)) });
+}
+
+// POST /api/admin/uploads — multipart, up to 8 files as "photos". Answers { urls }, to use as product photos.
+export async function uploadPhotos(request, response) {
+  response.status(201).json({ urls: await savePhotos(request.files) });
 }

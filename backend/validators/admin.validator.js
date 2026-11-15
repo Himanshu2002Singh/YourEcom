@@ -9,8 +9,8 @@ const MAX_STOCK = 1_000_000;
 const MAX_PHOTOS = 10;
 const MAX_FEATURES = 8;
 const MAX_SPECS = 20;
-// A photo already on the site (frontend/public/photos).
-const PHOTO = /^\/photos\/[\w.-]+\.(jpe?g|png|webp)$/i;
+// A photo already on the site (frontend/public/photos) or one uploaded from the admin pages (utils/uploads.js).
+const PHOTO = /^\/(photos|api\/uploads)\/[\w.-]+\.(jpe?g|png|webp)$/i;
 
 const text = value => (typeof value === 'string' ? value.trim() : '');
 const wholeNumber = (value, min, max) => Number.isInteger(value) && value >= min && value <= max;
@@ -71,7 +71,7 @@ export function cleanProduct(body) {
   if (!Array.isArray(photos) || !photos.length) throw new HttpError(400, 'Add at least one photo.');
   if (photos.length > MAX_PHOTOS) throw new HttpError(400, `Use up to ${MAX_PHOTOS} photos.`);
   if (!photos.every(photo => typeof photo === 'string' && PHOTO.test(photo)) || new Set(photos).size !== photos.length) {
-    throw new HttpError(400, 'Use photos already on the site, each once.');
+    throw new HttpError(400, 'Use photos uploaded here or already on the site, each once.');
   }
   return { ...product, price, mrp, stock, image: photos[0], gallery: photos.slice(1), features: cleanFeatures(features), specs: cleanSpecs(specs) };
 }

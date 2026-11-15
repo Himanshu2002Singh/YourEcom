@@ -5,6 +5,7 @@ import { before, test } from 'node:test';
 import { deliveryFeeFor, discountFor } from '../services/pricing.service.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
 import { readSession, startSession } from '../utils/session.js';
+import { photoType } from '../utils/uploads.js';
 import { cleanOrderQuery, cleanProduct, cleanStatusChange } from '../validators/admin.validator.js';
 import { MAX_QUANTITY, cleanCouponCode, cleanOrder, cleanStatus } from '../validators/order.validator.js';
 
@@ -85,11 +86,11 @@ test('admins move orders on to Shipped (with tracking), Delivered or Cancelled, 
 test('a product needs a name, category, price no higher than its MRP, pack, description, a photo and a highlight', () => {
   const product = {
     name: ' Syringe, 2 ml ', category: 'Syringes', family: ' Syringe ', variant: ' 2 ml ', price: 280, mrp: 500, stock: 0, unit: ' Box of 100 ', badge: '',
-    description: ' Sterile. ', photos: ['/photos/syringe-2ml.jpg', '/photos/syringe-2ml-side.jpg'], features: [' Sterile ', ''], specs: [[' Needle ', ' None '], ['', '']],
+    description: ' Sterile. ', photos: ['/photos/syringe-2ml.jpg', '/api/uploads/0a1b2c3d4e5f60718293a4b5.webp'], features: [' Sterile ', ''], specs: [[' Needle ', ' None '], ['', '']],
   };
   assert.deepEqual(cleanProduct(product), {
     name: 'Syringe, 2 ml', category: 'Syringes', family: 'Syringe', variant: '2 ml', price: 280, mrp: 500, stock: 0, unit: 'Box of 100', badge: null,
-    description: 'Sterile.', image: '/photos/syringe-2ml.jpg', gallery: ['/photos/syringe-2ml-side.jpg'], features: ['Sterile'], specs: [['Needle', 'None']],
+    description: 'Sterile.', image: '/photos/syringe-2ml.jpg', gallery: ['/api/uploads/0a1b2c3d4e5f60718293a4b5.webp'], features: ['Sterile'], specs: [['Needle', 'None']],
   });
   assert.equal(cleanProduct({ ...product, mrp: 280 }).mrp, 280, 'MRP may equal the price');
   assert.equal(cleanProduct({ ...product, mrp: null }).mrp, null);
@@ -100,6 +101,13 @@ test('a product needs a name, category, price no higher than its MRP, pack, desc
     { photos: ['/photos/a.svg'] }, { photos: ['/photos/a.jpg', '/photos/a.jpg'] }, { features: [' '] }, { features: 'Sterile' }, { specs: [['Needle', '']] },
   ];
   for (const change of invalid) assert.throws(() => cleanProduct({ ...product, ...change }), { status: 400 }, JSON.stringify(change));
+});
+
+test('only JPEG, PNG and WebP files count as photos, whatever they are called', () => {
+  assert.equal(photoType(Buffer.from([0xff, 0xd8, 0xff, 0xe0])), 'jpg');
+  assert.equal(photoType(Buffer.from('89504e470d0a1a0a00', 'hex')), 'png');
+  assert.equal(photoType(Buffer.from('RIFF\0\0\0\0WEBPVP8 ', 'latin1')), 'webp');
+  for (const other of ['<svg xmlns="http://www.w3.org/2000/svg"/>', 'GIF89a', '']) assert.equal(photoType(Buffer.from(other)), null, other);
 });
 
 test('passwords are hashed with a salt and verified', async () => {

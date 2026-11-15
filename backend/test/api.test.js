@@ -1,9 +1,12 @@
 // HTTP tests against the real Express app. The "with database" suite runs only when
 // DATABASE_URL is set (backend/.env) and uses throwaway accounts it deletes afterwards.
 import assert from 'node:assert/strict';
+import { rm } from 'node:fs/promises';
+import path from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import app from '../app.js';
 import { closeDb, query } from '../db/pool.js';
+import { UPLOAD_DIR } from '../utils/uploads.js';
 import * as User from '../models/user.model.js';
 
 let server;
@@ -66,6 +69,13 @@ describe('without a database', () => {
     assert.equal((await call('/admin/orders/YE00000000')).status, 401);
     assert.equal((await call('/admin/orders/YE00000000/status', { method: 'PUT', body: { status: 'Shipped' } })).status, 401);
     assert.equal((await call('/admin/products/1', { method: 'PUT', body: {} })).status, 401);
+    assert.equal((await call('/admin/uploads', { method: 'POST', body: {} })).status, 401);
+  });
+
+  test('uploads are the only multipart requests, and need X-Requested-With', async () => {
+    const send = headers => fetch(`${base}/admin/uploads`, { method: 'POST', headers, body: new FormData() }).then(response => response.status);
+    assert.equal(await send({}), 415, 'a form on another site can’t add the header');
+    assert.equal(await send({ 'X-Requested-With': 'fetch' }), 401);
   });
 
   test('bad registration input is rejected before touching the database', async () => {
@@ -414,6 +424,33 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
       const columns = ['name', 'category', 'family', 'variant', 'price', 'mrp', 'unit', 'stock', 'badge', 'image', 'gallery', 'description', 'features', 'specs'];
       const json = column => (['gallery', 'features', 'specs'].includes(column) && original[column] !== null ? JSON.stringify(original[column]) : original[column]);
       await query(`UPDATE products SET ${columns.map(column => `${column} = ?`).join(', ')} WHERE id = 4`, columns.map(json));
+    }
+  });
+
+  test('admins upload photos, which must really be JPEG, PNG or WebP', async () => {
+    const png = Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), Buffer.from('test photo')]);
+    const upload = (files, { as = cookie, header = true } = {}) => {
+      const form = new FormData();
+      for (const [name, bytes] of files) form.append('photos', new Blob([bytes]), name);
+      const headers = { Cookie: as, ...(header ? { 'X-Requested-With': 'fetch' } : {}) };
+      return fetch(`${base}/admin/uploads`, { method: 'POST', headers, body: form }).then(async response => ({ status: response.status, body: await response.json() }));
+    };
+    const uploaded = await upload([['front.png', png], ['back.PNG', png]]);
+    try {
+      assert.equal(uploaded.status, 201);
+      assert.equal(uploaded.body.urls.length, 2);
+      for (const url of uploaded.body.urls) assert.match(url, /^\/api\/uploads\/[0-9a-f]{24}\.png$/);
+      const served = await fetch(`${new URL(base).origin}${uploaded.body.urls[0]}`);
+      assert.deepEqual([served.status, served.headers.get('content-type'), served.headers.get('x-content-type-options')], [200, 'image/png', 'nosniff']);
+      assert.deepEqual(Buffer.from(await served.arrayBuffer()), png);
+
+      assert.deepEqual((await upload([['notes.png', Buffer.from('<svg/>')]])).body, { error: 'notes.png isn’t a JPEG, PNG or WebP photo.' });
+      assert.equal((await upload([['big.png', Buffer.concat([png, Buffer.alloc(5 * 1024 * 1024)])]])).status, 413);
+      assert.equal((await upload(Array.from({ length: 9 }, (_, index) => [`p${index}.png`, png]))).status, 400, 'up to 8 at a time');
+      assert.equal((await upload([['front.png', png]], { header: false })).status, 415);
+      assert.equal((await upload([['front.png', png]], { as: buyer })).status, 403);
+    } finally {
+      for (const url of uploaded.body.urls ?? []) await rm(path.join(UPLOAD_DIR, path.basename(url)), { force: true });
     }
   });
 
