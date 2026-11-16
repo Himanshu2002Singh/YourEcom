@@ -42,12 +42,21 @@ const COLUMNS = ['name', 'category', 'family', 'variant', 'price', 'mrp', 'unit'
 const LISTS = new Set(['gallery', 'features', 'specs']);
 const values = product => COLUMNS.map(column => (LISTS.has(column) ? JSON.stringify(product[column]) : product[column]));
 
+// A category the store already has keeps its spelling: "lab disposables" saves as "Lab Disposables", because
+// the column's collation compares without case. So a different case never makes a second category. A new
+// category is saved as typed.
+async function withStoreCategory(product) {
+  const [existing] = await query('SELECT category FROM products WHERE category = ? LIMIT 1', [product.category]);
+  return existing ? { ...product, category: existing.category } : product;
+}
+
 // A new product from the admin pages, numbered after the highest id. Locking the highest row first means
 // two products added at once get different numbers. Answers the product as the storefront sees it.
 export async function create(product) {
+  const row = values(await withStoreCategory(product));
   const id = await transaction(async connection => {
     const [[{ next }]] = await connection.query('SELECT COALESCE(MAX(id), 0) + 1 AS next FROM products FOR UPDATE');
-    await connection.execute(`INSERT INTO products (id, ${COLUMNS.join(', ')}) VALUES (?, ${COLUMNS.map(() => '?').join(', ')})`, [next, ...values(product)]);
+    await connection.execute(`INSERT INTO products (id, ${COLUMNS.join(', ')}) VALUES (?, ${COLUMNS.map(() => '?').join(', ')})`, [next, ...row]);
     return next;
   });
   return findById(id);
@@ -55,7 +64,7 @@ export async function create(product) {
 
 // Saves the admin's version of a product that exists, every field at once. Answers the product as it is now.
 export async function update(id, product) {
-  await query(`UPDATE products SET ${COLUMNS.map(column => `${column} = ?`).join(', ')} WHERE id = ?`, [...values(product), id]);
+  await query(`UPDATE products SET ${COLUMNS.map(column => `${column} = ?`).join(', ')} WHERE id = ?`, [...values(await withStoreCategory(product)), id]);
   return findById(id);
 }
 

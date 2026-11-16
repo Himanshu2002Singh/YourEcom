@@ -1,11 +1,13 @@
 import { HttpError } from '../utils/HttpError.js';
 
-// The storefront's categories (frontend/src/data/categories.ts). Every product is in one of them.
-export const CATEGORIES = ['Syringes', 'IV Cannula', 'IV Sets', 'IV Fluids', 'Gloves', 'Face Masks', 'Caps & Shoe Covers', 'Bandages & Gauze', 'Surgical Tapes', 'Lab Disposables', 'Toys & Party Syringes'];
+// A category is whatever its products say: the store's own and any an admin adds with a product. The
+// products.category column holds up to 60 characters.
+export const MAX_CATEGORY = 60;
 const MAX_SEARCH = 100;
 
-// GET /api/products?category=Gloves&q=nitrile — both filters are optional.
+// GET /api/products?category=Gloves&q=nitrile — both filters are optional. A category with no products
+// simply finds none.
 export function cleanProductQuery({ category = '', q = '' }) {
-  if (category && !CATEGORIES.includes(category)) throw new HttpError(400, `Choose a category: ${CATEGORIES.join(', ')}.`);
-  return { category: category || null, search: typeof q === 'string' ? q.trim().slice(0, MAX_SEARCH) : '' };
+  if (typeof category !== 'string' || category.length > MAX_CATEGORY) throw new HttpError(400, `Use a category name of up to ${MAX_CATEGORY} characters.`);
+  return { category: category.trim() || null, search: typeof q === 'string' ? q.trim().slice(0, MAX_SEARCH) : '' };
 }

@@ -38,7 +38,7 @@ DEALLOCATE PREPARE add_admin;
 CREATE TABLE IF NOT EXISTS products (
   id          INT           NOT NULL PRIMARY KEY,
   name        VARCHAR(200)  NOT NULL,
-  category    VARCHAR(60)   NOT NULL,   -- one of CATEGORIES in validators/product.validator.js
+  category    VARCHAR(60)   NOT NULL,   -- the store's own categories, and any an admin adds with a product
   family      VARCHAR(120)  NULL,       -- e.g. 'Disposable Syringe without Needle', shared by its sizes
   variant     VARCHAR(40)   NULL,       -- e.g. '2 ml', what sets this size apart within the family
   price       INT           NOT NULL,

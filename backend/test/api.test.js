@@ -91,8 +91,9 @@ describe('without a database', () => {
     assert.equal((await call('/auth/reset-password', { method: 'POST', body: { token: 'x', password: '123' } })).status, 400);
   });
 
-  test('an unknown product category is rejected before touching the database', async () => {
-    assert.equal((await call('/products?category=Toys')).status, 400);
+  test('a category filter that isn’t one name of up to 60 characters is rejected before touching the database', async () => {
+    assert.equal((await call(`/products?category=${'x'.repeat(61)}`)).status, 400);
+    assert.equal((await call('/products?category=Gloves&category=Syringes')).status, 400);
   });
 
   test('Google sign-in: no client ID hides it, and only a token Google signed gets in', async () => {
@@ -168,6 +169,7 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
     assert.deepEqual(await ids(`/products?category=${encodeURIComponent('IV Cannula')}`), [17, 18, 19, 20, 21, 36, 37]);
     assert.deepEqual(await ids('/products?q=SCALP'), [22, 23, 24]);
     assert.deepEqual(await ids('/products?q=cotton&category=Gloves'), []);
+    assert.deepEqual(await ids('/products?category=Toys'), [], 'a category with no products finds none');
     assert.deepEqual(await ids('/products?q=%25%25'), [], '% is matched as itself, not as a wildcard');
 
     assert.equal((await call('/products/2')).body.product.name, 'Nitrile Examination Gloves, Blue');
@@ -417,7 +419,7 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
         ...unbadged, name: 'IV Infusion Set, Vented', family: 'IV Infusion Set', variant: 'Vented', price: 850, mrp: 999, stock: 40, unit: 'Pack of 10 sets',
         description: 'A new description.', image: '/photos/test-main.jpg', gallery: [before.image], features: ['Vented spike'], specs: [['Tube', '150 cm']],
       }, `an empty badge (was ${badge}) is none`);
-      for (const change of [{ price: 0 }, { mrp: 849 }, { stock: '40' }, { name: '' }, { category: 'Toys' }, { variant: '' }, { photos: [] }, { photos: ['https://example.com/x.jpg'] }, { features: [] }]) {
+      for (const change of [{ price: 0 }, { mrp: 849 }, { stock: '40' }, { name: '' }, { category: ' ' }, { variant: '' }, { photos: [] }, { photos: ['https://example.com/x.jpg'] }, { features: [] }]) {
         assert.equal((await save(4, { ...changes, ...change })).status, 400, JSON.stringify(change));
       }
       assert.equal((await save(999, changes)).status, 404);
@@ -454,7 +456,7 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
 
       const [{ highest }] = await query('SELECT MAX(id) AS highest FROM products');
       const product = {
-        name: 'Test Specimen Bag', category: 'Lab Disposables', family: '', variant: '', price: 120, mrp: null, stock: 25, unit: 'Pack of 100', badge: 'New',
+        name: 'Test Specimen Bag', category: `Test Category ${stamp}`, family: '', variant: '', price: 120, mrp: null, stock: 25, unit: 'Pack of 100', badge: 'New',
         description: 'Zip-lock specimen bags.', photos: uploaded.body.urls, features: ['Zip lock'], specs: [],
       };
       const created = await call('/admin/products', { method: 'POST', cookie, body: product });
@@ -463,6 +465,10 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
       assert.equal(created.body.product.id, highest + 1);
       assert.deepEqual(formFor(created.body.product), product);
       assert.deepEqual((await call(`/products/${highest + 1}`)).body.product, created.body.product, 'in the store at once');
+      assert.deepEqual((await call(`/products?category=${encodeURIComponent(product.category)}`)).body.products.map(item => item.id), [highest + 1], 'in a new category');
+      const respelt = await call('/admin/products', { method: 'POST', cookie, body: { ...product, category: ' lab   DISPOSABLES ' } });
+      added.push(respelt.body.product?.id);
+      assert.equal(respelt.body.product.category, 'Lab Disposables', 'a category the store has keeps its spelling');
       assert.equal((await call('/admin/products', { method: 'POST', cookie, body: { ...product, photos: [] } })).status, 400);
       assert.equal((await call('/admin/products', { method: 'POST', cookie: buyer, body: product })).status, 403);
     } finally {

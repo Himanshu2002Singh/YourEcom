@@ -95,8 +95,9 @@ test('a product needs a name, category, price no higher than its MRP, pack, desc
   assert.equal(cleanProduct({ ...product, mrp: 280 }).mrp, 280, 'MRP may equal the price');
   assert.equal(cleanProduct({ ...product, mrp: null }).mrp, null);
   assert.deepEqual(Object.values(cleanProduct({ ...product, family: ' ', variant: '' })).slice(2, 4), [null, null], 'a product in one size has neither');
+  assert.equal(cleanProduct({ ...product, category: '  Wound   Care ' }).category, 'Wound Care', 'a new category, spaced once');
   const invalid = [
-    { name: ' ' }, { category: 'Toys' }, { variant: '' }, { price: 0 }, { price: '280' }, { mrp: 279 }, { mrp: undefined }, { stock: -1 }, { stock: 0.5 },
+    { name: ' ' }, { category: ' ' }, { category: 'x'.repeat(61) }, { category: 7 }, { variant: '' }, { price: 0 }, { price: '280' }, { mrp: 279 }, { mrp: undefined }, { stock: -1 }, { stock: 0.5 },
     { unit: '' }, { description: '  ' }, { badge: 'x'.repeat(41) }, { photos: [] }, { photos: ['https://example.com/x.jpg'] }, { photos: ['/photos/../../.env'] },
     { photos: ['/photos/a.svg'] }, { photos: ['/photos/a.jpg', '/photos/a.jpg'] }, { features: [' '] }, { features: 'Sterile' }, { specs: [['Needle', '']] },
   ];
