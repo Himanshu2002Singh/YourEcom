@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link, NavLink, Outlet } from 'react-router';
-import { ChevronLeft, ChevronRight, LayoutDashboard, LogOut, ReceiptText, ShieldAlert, Store, type LucideIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LayoutDashboard, LogOut, Package, ReceiptText, ShieldAlert, Store, type LucideIcon } from 'lucide-react';
 import type { User } from '@/types/store';
 
 // Shared by the admin pages (pages/admin).
@@ -15,6 +15,7 @@ export const LOW_STOCK = 10; // a product with this many or fewer left shows as 
 const sections: [string, string, LucideIcon][] = [
   ['Dashboard', '/admin', LayoutDashboard],
   ['Orders', '/admin/orders', ReceiptText],
+  ['Products', '/admin/products', Package],
 ];
 
 // The admin pages' frame, in place of the store's header and footer: the sections, the way back to the store

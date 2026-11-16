@@ -19,16 +19,20 @@ export class ApiError extends Error {
 
 type Options = { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: unknown };
 
+// A body is sent as JSON, except FormData (photo uploads), which the browser sends as multipart with its own
+// Content-Type. The API only takes multipart with X-Requested-With, which a form on another site can't add.
+function request(body: unknown): Pick<RequestInit, 'headers' | 'body'> {
+  if (body === undefined) return {};
+  if (body instanceof FormData) return { headers: { 'X-Requested-With': 'fetch' }, body };
+  return { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+}
+
 // Resolves with the JSON the API answers, or rejects with an ApiError whose message can be shown as-is.
 export async function api<T>(path: string, { method = 'GET', body }: Options = {}): Promise<T> {
   if (NO_API) throw new ApiError(`Online ordering isn’t open yet. To order, call or WhatsApp us on ${PHONE}.`, 0);
   let response: Response;
   try {
-    response = await fetch(`/api${path}`, {
-      method,
-      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
+    response = await fetch(`/api${path}`, { method, ...request(body) });
   } catch {
     throw new ApiError('Can’t reach YourEcom right now. Check your connection and try again.', 0);
   }

@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
-import { CalendarDays, ChevronRight, IndianRupee, PackageOpen, Truck, type LucideIcon } from 'lucide-react';
-import { LOW_STOCK, PageHeader, adminCard, adminMain, secondaryButton } from '@/components/AdminLayout';
+import { CalendarDays, ChevronRight, IndianRupee, PackageOpen, Plus, Truck, type LucideIcon } from 'lucide-react';
+import { LOW_STOCK, PageHeader, adminCard, adminMain, primaryButton, secondaryButton } from '@/components/AdminLayout';
 import { LoadError, Loading } from '@/components/StoreShared';
 import { useApiData } from '@/hooks/useApiData';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -78,6 +78,9 @@ export function AdminDashboard({ products, user }: { products: Product[]; user: 
             <Link to="/admin/orders?status=Processing" className={secondaryButton}>
               <PackageOpen size={16} /> Orders to ship
             </Link>
+            <Link to="/admin/products/new" className={primaryButton}>
+              <Plus size={16} /> Add product
+            </Link>
           </>
         }
       />
@@ -130,6 +133,9 @@ export function AdminDashboard({ products, user }: { products: Product[]; user: 
               <h2 className="font-semibold text-navy">Low stock</h2>
               <p className="text-xs text-slate-500">{LOW_STOCK} or fewer left</p>
             </div>
+            <Link to="/admin/products?stock=low" className="text-sm font-semibold text-brand hover:underline">
+              See all
+            </Link>
           </div>
           {lowStock.length === 0 ? (
             <p className="px-5 py-8 text-sm text-slate-500">Every product has more than {LOW_STOCK} in stock.</p>
@@ -137,13 +143,13 @@ export function AdminDashboard({ products, user }: { products: Product[]; user: 
             <ul className="max-h-[420px] divide-y divide-slate-100 overflow-y-auto">
               {lowStock.map((product: Product) => (
                 <li key={product.id}>
-                  <div className="flex items-center gap-3 px-4 py-2.5 sm:px-5">
+                  <Link to={`/admin/products/${product.id}`} className="flex items-center gap-3 px-4 py-2.5 transition hover:bg-brand-soft/60 sm:px-5">
                     <img src={product.image} alt="" className="h-10 w-10 shrink-0 rounded-lg border border-slate-100 bg-white object-contain p-0.5" />
                     <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-700">{product.name}</span>
                     <span className={`shrink-0 text-sm font-bold ${product.stock === 0 ? 'text-rose-600' : 'text-amber-700'}`}>
                       {product.stock === 0 ? 'Out of stock' : `${product.stock} left`}
                     </span>
-                  </div>
+                  </Link>
                 </li>
               ))}
             </ul>

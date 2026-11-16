@@ -13,6 +13,8 @@ import { AboutPage } from '@/pages/AboutPage';
 import { AdminDashboard } from '@/pages/admin/AdminDashboard';
 import { AdminOrderPage } from '@/pages/admin/AdminOrderPage';
 import { AdminOrdersPage } from '@/pages/admin/AdminOrdersPage';
+import { AdminProductEditor } from '@/pages/admin/AdminProductEditor';
+import { AdminProductsPage } from '@/pages/admin/AdminProductsPage';
 import { CheckoutPage } from '@/pages/CheckoutPage';
 import { HomePage } from '@/pages/HomePage';
 import { LoginPage } from '@/pages/LoginPage';
@@ -67,6 +69,14 @@ function App() {
   }, []);
 
   useEffect(loadProducts, [loadProducts]);
+
+  // A product an admin just added or changed: the storefront shows it at once, in catalogue (id) order.
+  const productSaved = useCallback((saved: Product): void => {
+    setProducts(
+      (current: Product[] | null) =>
+        current && [...current.filter((product: Product) => product.id !== saved.id), saved].sort((a: Product, b: Product) => a.id - b.id),
+    );
+  }, []);
 
   // Whether this browser is already signed in: the session cookie decides.
   useEffect(() => {
@@ -287,6 +297,14 @@ function App() {
           <Route index element={withProducts((catalogue: Product[]) => <AdminDashboard products={catalogue} user={user as User} />)} />
           <Route path="orders" element={<AdminOrdersPage />} />
           <Route path="orders/:id" element={<AdminOrderPage notify={notify} stockChanged={loadProducts} />} />
+          <Route path="products" element={withProducts((catalogue: Product[]) => <AdminProductsPage products={catalogue} />)} />
+          {['products/new', 'products/:id'].map((path: string) => (
+            <Route
+              key={path}
+              path={path}
+              element={withProducts((catalogue: Product[]) => <AdminProductEditor products={catalogue} productSaved={productSaved} notify={notify} />)}
+            />
+          ))}
           <Route path="*" element={<AdminNotFound />} />
         </Route>
         {/* The store: its header, footer and WhatsApp button around every other page. */}
