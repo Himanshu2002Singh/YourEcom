@@ -1,4 +1,4 @@
-import { categories } from '@/data/categories';
+import { NON_MEDICAL_CATEGORY, categories, categoryImages } from '@/data/categories';
 import type { Category, Product } from '@/types/store';
 
 // The sizes of one product (a family), or a product that comes in one size, in catalogue order.
@@ -45,8 +45,22 @@ export const discountOf = ({ price, mrp }: Pick<Product, 'price' | 'mrp'>): numb
 
 export const categoryPath = (category: Category): string => `/products?category=${encodeURIComponent(category)}`;
 
-// Store order: by category (syringes first), then catalogue order.
-export const byCategory = (a: Product, b: Product): number => categories.indexOf(a.category) - categories.indexOf(b.category);
+// Store order of categories: as data/categories.ts lists them, with any an admin added (A to Z) after the
+// medical ones and before the non-medical one.
+const listed: readonly string[] = categories;
+const rank = (category: Category): number => (listed.includes(category) ? listed.indexOf(category) : listed.indexOf(NON_MEDICAL_CATEGORY) - 0.5);
+export const byCategoryOrder = (a: Category, b: Category): number => rank(a) - rank(b) || a.localeCompare(b);
+
+// Store order of products: by category (syringes first), then catalogue order.
+export const byCategory = (a: Product, b: Product): number => byCategoryOrder(a.category, b.category);
+
+// The categories that have products, in store order. Until the catalogue loads, the store's own.
+export const storeCategories = (products: Product[] | null): Category[] =>
+  products ? [...new Set(products.map((product: Product) => product.category))].sort(byCategoryOrder) : [...categories];
+
+// A category's picture: the one chosen for it or, for one an admin added, its first product's main photo.
+export const categoryImage = (category: Category, products: Product[] | null): string | undefined =>
+  categoryImages[category] ?? products?.find((product: Product) => product.category === category)?.image;
 
 // Whether `query` (already lower case) appears in anything a customer would search by.
 export const matchesSearch = (product: Product, query: string): boolean =>

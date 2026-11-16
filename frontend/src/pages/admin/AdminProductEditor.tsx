@@ -7,10 +7,13 @@ import { TextField } from '@/components/TextField';
 import { categories } from '@/data/categories';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { api, type ApiError } from '@/lib/api';
+import { byCategoryOrder } from '@/lib/catalogue';
 import { perItemPrice } from '@/lib/pricing';
 import type { Product } from '@/types/store';
 
 type Notify = (message: string, options?: { error?: boolean }) => void;
+// The category select's value for "New category…". No category starts with a space (names are trimmed).
+const NEW_CATEGORY = ' new';
 type EditorProps = { products: Product[]; productSaved: (product: Product) => void; notify: Notify };
 type Form = {
   name: string;
@@ -213,6 +216,7 @@ function ProductEditor({ id, products, productSaved, notify }: EditorProps & { i
   const [form, setForm] = useState<Form>(existing ? formFrom(existing) : blankForm);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [newCategory, setNewCategory] = useState(false); // typing a category the store doesn't have yet
   usePageTitle(existing ? `${existing.name} · Admin` : id ? 'Product not found · Admin' : 'Add a product · Admin');
 
   if (id && !existing) {
@@ -228,6 +232,17 @@ function ProductEditor({ id, products, productSaved, notify }: EditorProps & { i
     (field: 'name' | 'category' | 'family' | 'variant' | 'price' | 'mrp' | 'stock' | 'unit' | 'badge' | 'description') =>
     (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>): void =>
       set(field, event.target.value);
+
+  // The store's categories and any an admin added, in store order. A new one typed in a different case
+  // ("gloves") is saved as the one the store has.
+  const categoryChoices = [...new Set<string>([...categories, ...products.map((product: Product) => product.category)])].sort(byCategoryOrder);
+  const typedCategory = form.category.trim().replace(/\s+/g, ' ').toLowerCase();
+  const sameCategory = newCategory ? categoryChoices.find((name: string) => name.toLowerCase() === typedCategory) : undefined;
+  const chooseCategory = (event: ChangeEvent<HTMLSelectElement>): void => {
+    const adding = event.target.value === NEW_CATEGORY;
+    setNewCategory(adding);
+    set('category', adding ? '' : event.target.value);
+  };
 
   // Families already in the catalogue, and the specification names it uses, offered as suggestions.
   const families = [...new Set(products.flatMap((product: Product) => (product.family ? [product.family] : [])))].sort();
@@ -246,6 +261,7 @@ function ProductEditor({ id, products, productSaved, notify }: EditorProps & { i
         : await api<{ product: Product }>('/admin/products', { method: 'POST', body });
       productSaved(product);
       setForm(formFrom(product));
+      setNewCategory(false); // a new category is in the list now
       if (existing) {
         notify(`Saved ${product.name}`);
       } else {
@@ -283,16 +299,32 @@ function ProductEditor({ id, products, productSaved, notify }: EditorProps & { i
                   <label htmlFor="category" className="mb-2 block text-sm font-semibold text-navy">
                     Category
                   </label>
-                  <select id="category" required value={form.category} onChange={edit('category')} className={fieldClass}>
+                  <select id="category" required value={newCategory ? NEW_CATEGORY : form.category} onChange={chooseCategory} className={fieldClass}>
                     <option value="" disabled>
                       Choose a category
                     </option>
-                    {categories.map((category) => (
+                    {categoryChoices.map((category: string) => (
                       <option key={category} value={category}>
                         {category}
                       </option>
                     ))}
+                    <option value={NEW_CATEGORY}>New category…</option>
                   </select>
+                  {newCategory && (
+                    <div className="mt-3">
+                      <TextField
+                        name="newCategory"
+                        label="New category’s name"
+                        required
+                        autoFocus
+                        maxLength={60}
+                        value={form.category}
+                        onChange={edit('category')}
+                        placeholder="e.g. Catheters"
+                        hint={sameCategory ? `${sameCategory} is already a category, so the product goes in it.` : 'It shows in the store’s menus once you save.'}
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="sm:col-span-2">
                   <label htmlFor="description" className="mb-2 flex justify-between text-sm font-semibold text-navy">

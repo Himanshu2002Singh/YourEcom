@@ -2,9 +2,8 @@ import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { ProductCard, panel, type ShopActions } from '@/components/StoreShared';
-import { categories } from '@/data/categories';
 import { usePageTitle } from '@/hooks/usePageTitle';
-import { byCategory, categoryPath, discountOf, groupByFamily, matchesSearch, type ProductGroup } from '@/lib/catalogue';
+import { byCategory, categoryPath, discountOf, groupByFamily, matchesSearch, storeCategories, type ProductGroup } from '@/lib/catalogue';
 import type { Category, Product } from '@/types/store';
 
 type Sort = 'relevance' | 'price-low' | 'price-high' | 'discount';
@@ -42,7 +41,8 @@ export function ProductsPage({ products, ...shop }: ProductsPageProps) {
   const [params, setParams] = useSearchParams();
   const [filtersOpen, setFiltersOpen] = useState(false);
   const query = (params.get('q') ?? '').trim();
-  const category = categories.find((name) => name === params.get('category')) ?? null;
+  const shopCategories = storeCategories(products);
+  const category = shopCategories.find((name) => name === params.get('category')) ?? null;
   const sort = sorts.find(([value]) => value === params.get('sort'))?.[0] ?? 'relevance';
   const band = priceBands.find(([value]) => value === params.get('price')) ?? null;
   const inStockOnly = params.get('stock') === 'in';
@@ -80,7 +80,7 @@ export function ProductsPage({ products, ...shop }: ProductsPageProps) {
       </div>
       <fieldset className="px-4 py-3">
         <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Category</legend>
-        {[null, ...categories].map((name: Category | null) => (
+        {[null, ...shopCategories].map((name: Category | null) => (
           <label key={name ?? 'all'} className="flex cursor-pointer items-center gap-2.5 py-1 text-slate-700 hover:text-brand">
             <input type="radio" name={`${id}-category`} checked={category === name} onChange={() => update('category', name)} className="accent-brand" />
             <span className="flex-1">{name ?? 'All categories'}</span>
@@ -184,7 +184,7 @@ export function ProductsPage({ products, ...shop }: ProductsPageProps) {
                     Clear filters
                   </button>
                 )}
-                {categories.map((name) => (
+                {shopCategories.map((name) => (
                   <Link key={name} to={categoryPath(name)} className="rounded-full border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:border-brand hover:text-brand">
                     {name}
                   </Link>

@@ -1,18 +1,19 @@
 import { Link } from 'react-router';
 import { BadgeCheck, ChevronRight, Headset, Mail, MapPin, Phone, ShieldCheck, Truck, type LucideIcon } from 'lucide-react';
 import { LoadError, Loading, ProductCard, WhatsAppIcon, panel, type ShopActions } from '@/components/StoreShared';
-import { NON_MEDICAL_CATEGORY, categories, categoryImages } from '@/data/categories';
+import { NON_MEDICAL_CATEGORY } from '@/data/categories';
 import { ABOUT_TEXT, governmentBuyers } from '@/data/company';
 import { ADDRESS, EMAIL, MAP_LINK, PHONE, PHONE_LINK, whatsAppLink } from '@/data/contact';
 import { usePageTitle } from '@/hooks/usePageTitle';
-import { byCategory, categoryPath, discountOf, groupByFamily, groupName, variantSummary, type ProductGroup } from '@/lib/catalogue';
+import { byCategory, categoryImage, categoryPath, discountOf, groupByFamily, groupName, storeCategories, variantSummary, type ProductGroup } from '@/lib/catalogue';
 import { formatPrice } from '@/lib/pricing';
 import type { Category, Product } from '@/types/store';
 
 const BULK_MESSAGE = 'Hello YourEcom, please share your bulk rate for syringes. Sizes and quantities I need: ';
 const QUOTE_MESSAGE = 'Hello YourEcom, please send a quotation for our hospital / clinic. Products and quantities: ';
 
-// After the syringes, every other category gets a panel, four to a row as on a marketplace home page.
+// After the syringes, every other category gets a panel, four to a row as on a marketplace home page. Categories
+// an admin added get a row of their own after these.
 const PANEL_ROWS: Category[][] = [
   ['IV Cannula', 'IV Sets', 'IV Fluids', 'Gloves'],
   ['Face Masks', 'Caps & Shoe Covers', 'Bandages & Gauze', 'Surgical Tapes'],
@@ -90,15 +91,22 @@ export function HomePage({ products, catalogueError, reloadProducts, ...shop }: 
   usePageTitle();
   const groups = groupByFamily([...(products ?? [])].sort(byCategory));
   const groupsIn = (category: Category): ProductGroup[] => groups.filter((group: ProductGroup) => group[0].category === category);
+  const shopCategories = storeCategories(products);
+  // A panel only for a category that has products, and one for each category an admin added.
+  const panels = (row: Category[]): Category[] => row.filter((category: Category) => shopCategories.includes(category));
+  const placed = new Set<Category>(['Syringes', ...PANEL_ROWS.flat()]);
+  const added = shopCategories.filter((category: Category) => !placed.has(category));
 
   return (
     <main className="mx-auto max-w-[1400px] space-y-3 px-2 py-3 sm:px-4">
       <section aria-label="Shop by category" className={`${panel} px-1 py-3 sm:px-3`}>
-        <ul className="flex gap-1 overflow-x-auto scrollbar-none lg:justify-between">
-          {categories.map((category) => (
+        {/* Phones scroll the strip sideways. Wide screens show every category, spread evenly, in as many rows
+            as the categories an admin adds need. */}
+        <ul className="flex gap-1 overflow-x-auto scrollbar-none lg:grid lg:grid-cols-[repeat(auto-fit,minmax(6.5rem,1fr))] lg:overflow-visible">
+          {shopCategories.map((category) => (
             <li key={category} className="shrink-0">
-              <Link to={categoryPath(category)} className="group flex w-[5.25rem] flex-col items-center gap-2 rounded-md p-1 text-center sm:w-28">
-                <img src={categoryImages[category]} alt="" className="h-16 w-16 rounded-full border border-slate-200 object-cover transition group-hover:scale-105 sm:h-20 sm:w-20" />
+              <Link to={categoryPath(category)} className="group flex w-[5.25rem] flex-col items-center gap-2 rounded-md p-1 text-center sm:w-28 lg:w-full">
+                <img src={categoryImage(category, products)} alt="" className="h-16 w-16 rounded-full border border-slate-200 object-cover transition group-hover:scale-105 sm:h-20 sm:w-20" />
                 <span className="text-xs font-medium leading-tight text-slate-800 group-hover:text-brand sm:text-sm">{category}</span>
               </Link>
             </li>
@@ -149,7 +157,7 @@ export function HomePage({ products, catalogueError, reloadProducts, ...shop }: 
           </section>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {PANEL_ROWS[0].map((category: Category) => (
+            {panels(PANEL_ROWS[0]).map((category: Category) => (
               <CategoryPanel key={category} category={category} groups={groupsIn(category)} />
             ))}
           </div>
@@ -195,13 +203,13 @@ export function HomePage({ products, catalogueError, reloadProducts, ...shop }: 
           </section>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {PANEL_ROWS[1].map((category: Category) => (
+            {panels(PANEL_ROWS[1]).map((category: Category) => (
               <CategoryPanel key={category} category={category} groups={groupsIn(category)} />
             ))}
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {PANEL_ROWS[2].map((category: Category) => (
+            {panels(PANEL_ROWS[2]).map((category: Category) => (
               <CategoryPanel key={category} category={category} groups={groupsIn(category)} />
             ))}
             <section className={`${panel} flex flex-col p-4`}>
@@ -222,12 +230,20 @@ export function HomePage({ products, catalogueError, reloadProducts, ...shop }: 
             </section>
           </div>
 
+          {added.length > 0 && (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {added.map((category: Category) => (
+                <CategoryPanel key={category} category={category} groups={groupsIn(category)} />
+              ))}
+            </div>
+          )}
+
           <section className={panel}>
             <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-4 py-3">
               <div>
                 <h2 className="text-lg font-bold text-slate-900 sm:text-xl">One from every category</h2>
                 <p className="text-sm text-slate-500">
-                  {products.length} products in {categories.length} categories
+                  {products.length} products in {shopCategories.length} categories
                 </p>
               </div>
               <Link to="/products" className={viewAllClass}>
@@ -235,7 +251,7 @@ export function HomePage({ products, catalogueError, reloadProducts, ...shop }: 
               </Link>
             </div>
             <div className="flex gap-2 overflow-x-auto p-2 scrollbar-none sm:grid sm:grid-cols-3 sm:gap-3 sm:overflow-visible sm:p-3 lg:grid-cols-4 xl:grid-cols-6">
-              {categories.flatMap((category) => groupsIn(category).slice(0, 1)).map((group: ProductGroup) => (
+              {shopCategories.flatMap((category) => groupsIn(category).slice(0, 1)).map((group: ProductGroup) => (
                 <div key={group[0].id} className="w-[46%] shrink-0 sm:w-auto">
                   <ProductCard group={group} {...shop} />
                 </div>

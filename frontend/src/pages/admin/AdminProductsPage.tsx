@@ -2,9 +2,8 @@ import { Link, useSearchParams } from 'react-router';
 import { ChevronRight, PackageSearch, Plus, Search } from 'lucide-react';
 import { LOW_STOCK, PageHeader, Pagination, adminCard, adminMain, primaryButton } from '@/components/AdminLayout';
 import { Price } from '@/components/StoreShared';
-import { categories } from '@/data/categories';
 import { usePageTitle } from '@/hooks/usePageTitle';
-import { matchesSearch } from '@/lib/catalogue';
+import { matchesSearch, storeCategories } from '@/lib/catalogue';
 import type { Product } from '@/types/store';
 
 const PAGE_SIZE = 20;
@@ -34,6 +33,7 @@ export function AdminProductsPage({ products }: { products: Product[] }) {
   const search = params.get('q') ?? '';
   const category = params.get('category') ?? '';
   const stock = (params.get('stock') ?? '') as Stock;
+  const shopCategories = storeCategories(products);
 
   // Changes the filters in the address; an empty value removes one. Any filter change starts again at page 1.
   const change = (values: Record<string, string>): void => {
@@ -58,7 +58,7 @@ export function AdminProductsPage({ products }: { products: Product[] }) {
     <main className={adminMain}>
       <PageHeader
         title="Products"
-        description={`${products.length} products in ${categories.length} categories`}
+        description={`${products.length} products in ${shopCategories.length} categories`}
         actions={
           <Link to="/admin/products/new" className={primaryButton}>
             <Plus size={16} /> Add product
@@ -85,7 +85,7 @@ export function AdminProductsPage({ products }: { products: Product[] }) {
           className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm outline-none focus:border-brand"
         >
           <option value="">All categories</option>
-          {categories.map((name) => (
+          {shopCategories.map((name) => (
             <option key={name} value={name}>
               {name}
             </option>

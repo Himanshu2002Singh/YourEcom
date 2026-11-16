@@ -1,6 +1,7 @@
-// The store's categories, in the order the storefront shows them (syringes, the client's main line, first;
-// the non-medical party and toy syringes last), each with the client's photo that stands for it. The products
-// themselves come from the API; the backend accepts the same category names (backend/validators/product.validator.js).
+// The store's own categories, in the order the storefront shows them (syringes, the client's main line, first;
+// the non-medical party and toy syringes last), each with the client's photo that stands for it. The store lists
+// whichever categories have products, so a category an admin adds with a product shows too, before the
+// non-medical one, with its first product's photo (lib/catalogue.ts).
 export const categories = [
   'Syringes',
   'IV Cannula',
@@ -15,7 +16,7 @@ export const categories = [
   'Toys & Party Syringes',
 ] as const;
 
-export const categoryImages: Record<(typeof categories)[number], string> = {
+export const categoryImages: Partial<Record<string, string>> = {
   Syringes: '/photos/syringe-without-needle.jpg',
   'IV Cannula': '/photos/iv-cannula.jpg',
   'IV Sets': '/photos/scalp-vein-set.jpg',

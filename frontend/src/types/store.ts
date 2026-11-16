@@ -1,6 +1,5 @@
-import type { categories } from '@/data/categories';
-
-export type Category = (typeof categories)[number];
+// A category's name: one of the store's own (data/categories.ts) or one an admin added with a product.
+export type Category = string;
 
 export type Product = {
   id: number;

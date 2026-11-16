@@ -313,7 +313,7 @@ function App() {
             <>
               <Header cartCount={cartCount} wishlistCount={wishlist?.length ?? 0} openCart={openCart} user={user ?? null} products={products} />
               <Outlet />
-              <Footer />
+              <Footer products={products} />
               <WhatsAppButton />
             </>
           }
@@ -322,7 +322,7 @@ function App() {
             path="/"
             element={<HomePage {...shopActions} products={products} catalogueError={catalogueError} reloadProducts={loadProducts} />}
           />
-          <Route path="/about" element={<AboutPage />} />
+          <Route path="/about" element={<AboutPage products={products} />} />
           <Route path="/products" element={withProducts((catalogue: Product[]) => <ProductsPage {...shopActions} products={catalogue} />)} />
           <Route
             path="/product/:id"

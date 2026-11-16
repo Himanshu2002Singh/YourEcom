@@ -2,17 +2,16 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 
 import { Link, useLocation, useNavigate } from 'react-router';
 import { ChevronRight, ExternalLink, Heart, Mail, MapPin, Menu, Package, Phone, Search, ShoppingCart, UserRound, X } from 'lucide-react';
 import { WhatsAppIcon } from '@/components/StoreShared';
-import { categories } from '@/data/categories';
 import { ADDRESS, EMAIL, GSTIN, INDIAMART_LINK, MAP_LINK, PHONE, PHONE_LINK, whatsAppLink } from '@/data/contact';
-import { categoryPath, groupByFamily, groupName, matchesSearch, type ProductGroup } from '@/lib/catalogue';
-import type { Product, User } from '@/types/store';
+import { categoryPath, groupByFamily, groupName, matchesSearch, storeCategories, type ProductGroup } from '@/lib/catalogue';
+import type { Category, Product, User } from '@/types/store';
 
 type HeaderProps = {
   cartCount: number;
   wishlistCount: number;
   openCart: () => void;
   user: User | null;
-  products: Product[] | null; // for search suggestions; null while the catalogue loads
+  products: Product[] | null; // for search suggestions and the categories; null while the catalogue loads
 };
 
 const BULK_MESSAGE = 'Hello YourEcom, I would like a quotation for a bulk order. Products and quantities: ';
@@ -90,7 +89,7 @@ function SearchBox({ products, className }: { products: Product[] | null; classN
         className="hidden max-w-36 shrink-0 cursor-pointer rounded-l-md border-r border-slate-300 bg-slate-100 px-2 text-xs text-slate-600 outline-none hover:bg-slate-200 lg:block"
       >
         <option value="">All categories</option>
-        {categories.map((name) => (
+        {storeCategories(products).map((name) => (
           <option key={name} value={name}>
             {name}
           </option>
@@ -141,6 +140,7 @@ export function Header({ cartCount, wishlistCount, openCart, user, products }: H
   const accountPath = user ? '/profile' : '/login';
   const greeting = user ? `Hello, ${user.name.split(' ')[0]}` : 'Hello, sign in';
   const closeMenu = (): void => setMenuOpen(false);
+  const shopCategories = storeCategories(products);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -152,7 +152,7 @@ export function Header({ cartCount, wishlistCount, openCart, user, products }: H
   }, [menuOpen]);
 
   const menuSections: [string, [string, string][]][] = [
-    ['Shop by category', categories.map((category): [string, string] => [category, categoryPath(category)])],
+    ['Shop by category', shopCategories.map((category): [string, string] => [category, categoryPath(category)])],
     [
       'Your account',
       [
@@ -222,7 +222,7 @@ export function Header({ cartCount, wishlistCount, openCart, user, products }: H
           <Link to="/products" className={`whitespace-nowrap rounded px-2.5 py-2 font-bold transition hover:bg-white/15 ${pathname === '/products' && !activeCategory ? 'bg-white/15' : ''}`}>
             All products
           </Link>
-          {categories.map((category) => (
+          {shopCategories.map((category) => (
             <Link
               key={category}
               to={categoryPath(category)}
@@ -291,8 +291,9 @@ export function WhatsAppButton() {
   );
 }
 
-const footerLinks: [string, [string, string][]][] = [
-  ['Shop', categories.map((category): [string, string] => [category, categoryPath(category)])],
+// The footer's link columns. Shop lists the store's categories.
+const footerLinks = (shop: Category[]): [string, [string, string][]][] => [
+  ['Shop', shop.map((category): [string, string] => [category, categoryPath(category)])],
   [
     'Your account',
     [
@@ -313,7 +314,7 @@ const footerLinks: [string, [string, string][]][] = [
   ],
 ];
 
-export function Footer() {
+export function Footer({ products }: { products: Product[] | null }) {
   return (
     <footer className="mt-8 text-sm print:hidden">
       <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="block w-full bg-brand py-3.5 text-center font-medium text-white transition hover:bg-brand-dark">
@@ -355,7 +356,7 @@ export function Footer() {
               </a>
             </p>
           </div>
-          {footerLinks.map(([title, links]) => (
+          {footerLinks(storeCategories(products)).map(([title, links]) => (
             <nav key={title} aria-label={title}>
               <p className="font-bold text-white">{title}</p>
               <ul className="mt-4 space-y-2.5">

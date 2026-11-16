@@ -1,11 +1,11 @@
 import { Link } from 'react-router';
 import { ChevronRight, ExternalLink, Landmark, Mail, MapPin, Phone, ReceiptText } from 'lucide-react';
 import { WhatsAppIcon, panel } from '@/components/StoreShared';
-import { categories, categoryImages } from '@/data/categories';
 import { ABOUT_TEXT, SUPPLY_TYPES, governmentBuyers, stockPhotos } from '@/data/company';
 import { ADDRESS, EMAIL, GSTIN, INDIAMART_LINK, MAP_LINK, PHONE, PHONE_LINK, whatsAppLink } from '@/data/contact';
 import { usePageTitle } from '@/hooks/usePageTitle';
-import { categoryPath } from '@/lib/catalogue';
+import { categoryImage, categoryPath, storeCategories } from '@/lib/catalogue';
+import type { Product } from '@/types/store';
 
 const QUOTE_MESSAGE = 'Hello YourEcom, please send a quotation. Products and quantities: ';
 
@@ -13,7 +13,7 @@ const sectionTitle = 'text-lg font-bold text-slate-900 sm:text-xl';
 
 // Who YourEcom is: the client's own words, the government buyers they have supplied, their stock, what they
 // sell and their business details.
-export function AboutPage() {
+export function AboutPage({ products }: { products: Product[] | null }) {
   usePageTitle('About us');
   return (
     <main className="mx-auto max-w-[1400px] space-y-3 px-2 py-3 sm:px-4">
@@ -92,10 +92,10 @@ export function AboutPage() {
           </Link>
         </div>
         <ul className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-          {categories.map((category) => (
+          {storeCategories(products).map((category) => (
             <li key={category}>
               <Link to={categoryPath(category)} className="group block text-center">
-                <img src={categoryImages[category]} alt="" loading="lazy" className="aspect-square w-full rounded-md border border-slate-200 object-cover transition group-hover:border-brand" />
+                <img src={categoryImage(category, products)} alt="" loading="lazy" className="aspect-square w-full rounded-md border border-slate-200 object-cover transition group-hover:border-brand" />
                 <span className="mt-1.5 block text-xs font-medium leading-tight text-slate-800 group-hover:text-brand sm:text-sm">{category}</span>
               </Link>
             </li>
