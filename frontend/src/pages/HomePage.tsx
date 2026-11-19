@@ -9,7 +9,6 @@ import { byCategory, categoryImage, categoryPath, discountOf, groupByFamily, gro
 import { formatPrice } from '@/lib/pricing';
 import type { Category, Product } from '@/types/store';
 
-const BULK_MESSAGE = 'Hello YourEcom, please share your bulk rate for syringes. Sizes and quantities I need: ';
 const QUOTE_MESSAGE = 'Hello YourEcom, please send a quotation for our hospital / clinic. Products and quantities: ';
 
 // After the syringes, every other category gets a panel, four to a row as on a marketplace home page. Categories
@@ -128,31 +127,13 @@ export function HomePage({ products, catalogueError, reloadProducts, ...shop }: 
                 View all <ChevronRight size={16} />
               </Link>
             </div>
-            <div className="grid gap-3 p-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)]">
-              <div className="flex gap-3 overflow-x-auto scrollbar-none sm:grid sm:grid-cols-3 sm:overflow-visible lg:order-last">
-                {groupsIn('Syringes').map((group: ProductGroup) => (
-                  <div key={group[0].id} className="w-[46%] shrink-0 sm:w-auto">
-                    <ProductCard group={group} {...shop} />
-                  </div>
-                ))}
-              </div>
-              <aside className="relative flex min-h-56 flex-col justify-end overflow-hidden rounded-md bg-navy p-5 text-white">
-                <img src="/photos/coloured-syringes.jpg" alt="" className="absolute inset-0 h-full w-full object-cover opacity-40" />
-                <div className="absolute inset-0 bg-gradient-to-t from-navy via-navy/70 to-transparent" />
-                <div className="relative">
-                  <p className="text-xs font-bold uppercase tracking-widest text-cart">Bulk rates</p>
-                  <p className="mt-1 text-xl font-bold leading-snug">Syringes for hospitals and clinics, by the carton</p>
-                  <p className="mt-2 text-sm text-blue-100">Tell us the sizes and quantities and we will send a quotation.</p>
-                  <a
-                    href={whatsAppLink(BULK_MESSAGE)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-bold text-navy transition hover:bg-brand-soft"
-                  >
-                    <WhatsAppIcon size={17} className="text-whatsapp" /> Get a bulk rate
-                  </a>
+            {/* Phones scroll the syringes sideways; wider screens give each range an equal share of the row. */}
+            <div className="flex gap-3 overflow-x-auto p-3 scrollbar-none sm:grid sm:grid-cols-2 sm:overflow-visible md:grid-cols-[repeat(auto-fit,minmax(10.5rem,1fr))]">
+              {groupsIn('Syringes').map((group: ProductGroup) => (
+                <div key={group[0].id} className="w-[46%] shrink-0 sm:w-auto">
+                  <ProductCard group={group} {...shop} />
                 </div>
-              </aside>
+              ))}
             </div>
           </section>
 
