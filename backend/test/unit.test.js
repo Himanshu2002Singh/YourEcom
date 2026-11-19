@@ -85,13 +85,23 @@ test('admins move orders on to Shipped (with tracking), Delivered or Cancelled, 
 
 test('a product needs a name, category, price no higher than its MRP, pack, description, a photo and a highlight', () => {
   const product = {
-    name: ' Syringe, 2 ml ', category: 'Syringes', family: ' Syringe ', variant: ' 2 ml ', price: 280, mrp: 500, stock: 0, unit: ' Box of 100 ', badge: '',
+    name: ' Syringe, 2 ml ', category: 'Syringes', family: ' Syringe ', variant: ' 2 ml ', price: 280, mrp: 500, bulk: null, stock: 0, unit: ' Box of 100 ', badge: '',
     description: ' Sterile. ', photos: ['/photos/syringe-2ml.jpg', '/api/uploads/0a1b2c3d4e5f60718293a4b5.webp'], features: [' Sterile ', ''], specs: [[' Needle ', ' None '], ['', '']],
   };
   assert.deepEqual(cleanProduct(product), {
-    name: 'Syringe, 2 ml', category: 'Syringes', family: 'Syringe', variant: '2 ml', price: 280, mrp: 500, stock: 0, unit: 'Box of 100', badge: null,
-    description: 'Sterile.', image: '/photos/syringe-2ml.jpg', gallery: ['/api/uploads/0a1b2c3d4e5f60718293a4b5.webp'], features: ['Sterile'], specs: [['Needle', 'None']],
+    name: 'Syringe, 2 ml', category: 'Syringes', family: 'Syringe', variant: '2 ml', price: 280, mrp: 500, bulk_price: null, bulk_min_qty: null, gst_rate: null, stock: 0,
+    unit: 'Box of 100', badge: null, description: 'Sterile.', image: '/photos/syringe-2ml.jpg', gallery: ['/api/uploads/0a1b2c3d4e5f60718293a4b5.webp'], features: ['Sterile'],
+    specs: [['Needle', 'None']],
   });
+  const bulk = { price: 250, minQuantity: 10, gstRate: 5 };
+  assert.deepEqual(Object.entries(cleanProduct({ ...product, bulk })).filter(([column]) => /bulk|gst/.test(column)), [['bulk_price', 250], ['bulk_min_qty', 10], ['gst_rate', 5]]);
+  assert.equal(cleanProduct({ ...product, mrp: null, bulk: { ...bulk, price: 5000 } }).bulk_price, 5000, 'no MRP, no ceiling');
+  const invalidBulk = [
+    undefined, 'yes', [bulk], { ...bulk, price: 0 }, { ...bulk, price: 249.5 }, { ...bulk, gstRate: -1 }, { ...bulk, gstRate: 41 }, { ...bulk, gstRate: '5' }, { ...bulk, minQuantity: 0 },
+    { ...bulk, minQuantity: MAX_QUANTITY + 1 }, { ...bulk, price: 477, gstRate: 5 },
+  ];
+  for (const terms of invalidBulk) assert.throws(() => cleanProduct({ ...product, bulk: terms }), { status: 400 }, `${JSON.stringify(terms)} (₹477 + 5% is above the ₹500 MRP)`);
+  assert.equal(cleanProduct({ ...product, bulk: { ...bulk, price: 476 } }).bulk_price, 476, '₹476 + 5% is ₹499.80, under the MRP');
   assert.equal(cleanProduct({ ...product, mrp: 280 }).mrp, 280, 'MRP may equal the price');
   assert.equal(cleanProduct({ ...product, mrp: null }).mrp, null);
   assert.deepEqual(Object.values(cleanProduct({ ...product, family: ' ', variant: '' })).slice(2, 4), [null, null], 'a product in one size has neither');

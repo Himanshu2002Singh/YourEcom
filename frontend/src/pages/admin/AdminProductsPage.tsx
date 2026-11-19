@@ -4,6 +4,7 @@ import { LOW_STOCK, PageHeader, Pagination, adminCard, adminMain, primaryButton 
 import { Price } from '@/components/StoreShared';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { matchesSearch, storeCategories } from '@/lib/catalogue';
+import { formatPrice } from '@/lib/pricing';
 import type { Product } from '@/types/store';
 
 const PAGE_SIZE = 20;
@@ -16,6 +17,16 @@ const stockFilters: [Stock, string][] = [
 ];
 const inStockFilter = (product: Product, filter: Stock): boolean =>
   filter === 'low' ? product.stock <= LOW_STOCK : filter === 'out' ? product.stock === 0 : true;
+
+// The bulk terms under the retail price, for a product sold in bulk too.
+function BulkNote({ product }: { product: Product }) {
+  if (!product.bulk) return null;
+  return (
+    <span className="block whitespace-nowrap text-xs font-semibold text-brand">
+      Bulk {formatPrice(product.bulk.price)} + {product.bulk.gstRate}% · min {product.bulk.minQuantity}
+    </span>
+  );
+}
 
 function StockBadge({ stock }: { stock: number }) {
   if (stock === 0) return <span className="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-600">Out of stock</span>;
@@ -137,10 +148,14 @@ export function AdminProductsPage({ products }: { products: Product[] }) {
                         <Price product={product} className="text-sm [&>span:first-child]:text-base" />
                         <StockBadge stock={product.stock} />
                       </span>
+                      <span className="md:hidden">
+                        <BulkNote product={product} />
+                      </span>
                     </span>
                   </span>
                   <span className="hidden md:block">
                     <Price product={product} className="[&>span:first-child]:text-base" />
+                    <BulkNote product={product} />
                   </span>
                   <span className="hidden md:block">
                     <StockBadge stock={product.stock} />

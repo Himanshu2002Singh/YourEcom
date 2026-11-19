@@ -38,7 +38,7 @@ export async function findFromParam(id) {
 }
 
 // What the admin pages write: every column but id (validators/admin.validator.js cleans them). Lists are JSON.
-const COLUMNS = ['name', 'category', 'family', 'variant', 'price', 'mrp', 'unit', 'stock', 'badge', 'image', 'gallery', 'description', 'features', 'specs'];
+const COLUMNS = ['name', 'category', 'family', 'variant', 'price', 'mrp', 'bulk_price', 'bulk_min_qty', 'gst_rate', 'unit', 'stock', 'badge', 'image', 'gallery', 'description', 'features', 'specs'];
 const LISTS = new Set(['gallery', 'features', 'specs']);
 const values = product => COLUMNS.map(column => (LISTS.has(column) ? JSON.stringify(product[column]) : product[column]));
 

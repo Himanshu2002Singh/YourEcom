@@ -1,10 +1,11 @@
 import { HttpError } from '../utils/HttpError.js';
-import { cleanStatus } from './order.validator.js';
+import { MAX_QUANTITY, cleanStatus } from './order.validator.js';
 import { MAX_CATEGORY } from './product.validator.js';
 
 // Input to the admin pages' API (routes/admin.routes.js).
 export const ORDERS_PAGE_SIZE = 20;
 const MAX_RUPEES = 10_000_000; // ₹1 crore, far above any pack
+const MAX_GST = 40; // the highest GST rate there is
 const MAX_STOCK = 1_000_000;
 const MAX_PHOTOS = 10;
 const MAX_FEATURES = 8;
@@ -51,13 +52,30 @@ function cleanSpecs(specs) {
   return rows;
 }
 
+// How a product sells in bulk, as the products table keeps it: null when it is sold retail only, otherwise
+// { price, minQuantity, gstRate }: a pack's price before GST, the fewest packs a bulk order takes, and the GST
+// percentage added on top. With GST a bulk pack may not cost more than the MRP either.
+function cleanBulk(bulk, mrp) {
+  if (bulk === null) return { bulk_price: null, bulk_min_qty: null, gst_rate: null };
+  if (typeof bulk !== 'object' || Array.isArray(bulk)) throw new HttpError(400, 'Say whether the product sells in bulk: its bulk terms, or null.');
+  const { price, minQuantity, gstRate } = bulk;
+  if (!wholeNumber(price, 1, MAX_RUPEES)) throw new HttpError(400, 'The bulk price must be a whole number of rupees, at least ₹1.');
+  if (!wholeNumber(gstRate, 0, MAX_GST)) throw new HttpError(400, `GST must be a whole percentage from 0 to ${MAX_GST}.`);
+  if (!wholeNumber(minQuantity, 1, MAX_QUANTITY)) throw new HttpError(400, `The smallest bulk order must be a whole number of packs from 1 to ${MAX_QUANTITY}.`);
+  if (mrp !== null && price * (100 + gstRate) > mrp * 100) {
+    throw new HttpError(400, `With ${gstRate}% GST a bulk pack would cost more than its MRP of ₹${mrp.toLocaleString('en-IN')}. Lower the bulk price.`);
+  }
+  return { bulk_price: price, bulk_min_qty: minQuantity, gst_rate: gstRate };
+}
+
 // POST and PUT /api/admin/products: the whole product, as the product form sends it. Sizes of one product share
 // a family (the name the storefront shows for them) and each has its own variant; a product in one size has
 // neither. `photos` lists its photo URLs, main photo first. mrp is null when the pack has none, and may not be
-// below the price, because nothing may be sold above its MRP. An empty badge is null. The category is one the
-// store has or a new one (models/product.model.js keeps an existing one's spelling).
+// below the price, because nothing may be sold above its MRP. The price is the retail price, GST included; `bulk`
+// is how it sells in bulk (cleanBulk). An empty badge is null. The category is one the store has or a new one
+// (models/product.model.js keeps an existing one's spelling).
 export function cleanProduct(body) {
-  const { name, category, family, variant, price, mrp, stock, unit, badge, description, photos, features, specs } = body ?? {};
+  const { name, category, family, variant, price, mrp, bulk, stock, unit, badge, description, photos, features, specs } = body ?? {};
   const product = { name: text(name), category: text(category).replace(/\s+/g, ' '), family: text(family) || null, variant: text(variant) || null, unit: text(unit), badge: text(badge) || null, description: text(description) };
   if (!product.name || product.name.length > 200) throw new HttpError(400, 'Enter the product’s name, in up to 200 characters.');
   if (!product.category || product.category.length > MAX_CATEGORY) throw new HttpError(400, `Choose a category, or name a new one in up to ${MAX_CATEGORY} characters.`);
@@ -74,5 +92,5 @@ export function cleanProduct(body) {
   if (!photos.every(photo => typeof photo === 'string' && PHOTO.test(photo)) || new Set(photos).size !== photos.length) {
     throw new HttpError(400, 'Use photos uploaded here or already on the site, each once.');
   }
-  return { ...product, price, mrp, stock, image: photos[0], gallery: photos.slice(1), features: cleanFeatures(features), specs: cleanSpecs(specs) };
+  return { ...product, price, mrp, ...cleanBulk(bulk, mrp), stock, image: photos[0], gallery: photos.slice(1), features: cleanFeatures(features), specs: cleanSpecs(specs) };
 }

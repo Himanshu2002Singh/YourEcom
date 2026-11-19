@@ -7,8 +7,9 @@ import { TextField } from '@/components/TextField';
 import { categories } from '@/data/categories';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { api, type ApiError } from '@/lib/api';
+import { MAX_QUANTITY } from '@/lib/cart';
 import { byCategoryOrder } from '@/lib/catalogue';
-import { perItemPrice } from '@/lib/pricing';
+import { formatPrice, gstFor, perItemPrice } from '@/lib/pricing';
 import type { Product } from '@/types/store';
 
 type Notify = (message: string, options?: { error?: boolean }) => void;
@@ -20,8 +21,12 @@ type Form = {
   category: string;
   family: string;
   variant: string;
-  price: string;
+  price: string; // retail, GST included
   mrp: string;
+  bulkOn: boolean; // sold in bulk too, on the three terms below
+  bulkPrice: string; // a pack, before GST
+  gstRate: string; // the GST % added to the bulk price
+  bulkMin: string; // the fewest packs in a bulk order
   stock: string;
   unit: string;
   badge: string;
@@ -36,10 +41,15 @@ const MAX_PHOTOS = 10;
 const PHOTOS_PER_UPLOAD = 8;
 const MAX_FEATURES = 8;
 const MAX_SPECS = 20;
+const MAX_GST = 40;
 const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const LONGEST_EDGE = 1600; // px: plenty for the product page's zoom-free gallery
+const GST_RATES = [0, 5, 18]; // offered as suggestions; any whole rate up to MAX_GST can be typed
 
-const blankForm: Form = { name: '', category: '', family: '', variant: '', price: '', mrp: '', stock: '', unit: '', badge: '', description: '', photos: [], features: [''], specs: [] };
+const blankForm: Form = {
+  name: '', category: '', family: '', variant: '', price: '', mrp: '', bulkOn: false, bulkPrice: '', gstRate: '', bulkMin: '', stock: '', unit: '', badge: '', description: '',
+  photos: [], features: [''], specs: [],
+};
 
 const formFrom = (product: Product): Form => ({
   name: product.name,
@@ -48,6 +58,10 @@ const formFrom = (product: Product): Form => ({
   variant: product.variant ?? '',
   price: String(product.price),
   mrp: product.mrp === null ? '' : String(product.mrp),
+  bulkOn: product.bulk !== null,
+  bulkPrice: product.bulk ? String(product.bulk.price) : '',
+  gstRate: product.bulk ? String(product.bulk.gstRate) : '',
+  bulkMin: product.bulk ? String(product.bulk.minQuantity) : '',
   stock: String(product.stock),
   unit: product.unit,
   badge: product.badge ?? '',
@@ -229,7 +243,7 @@ function ProductEditor({ id, products, productSaved, notify }: EditorProps & { i
 
   const set = <K extends keyof Form>(field: K, value: Form[K]): void => setForm((current: Form) => ({ ...current, [field]: value }));
   const edit =
-    (field: 'name' | 'category' | 'family' | 'variant' | 'price' | 'mrp' | 'stock' | 'unit' | 'badge' | 'description') =>
+    (field: Exclude<keyof Form, 'bulkOn' | 'photos' | 'features' | 'specs'>) =>
     (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>): void =>
       set(field, event.target.value);
 
@@ -249,13 +263,15 @@ function ProductEditor({ id, products, productSaved, notify }: EditorProps & { i
   const specLabels = [...new Set(products.flatMap((product: Product) => product.specs.map(([label]) => label)))].sort();
   const price = Number(form.price);
   const mrp = form.mrp.trim() ? Number(form.mrp) : null;
+  const { bulkOn, bulkPrice, gstRate, bulkMin, ...fields } = form;
+  const bulk = bulkOn ? { price: Number(bulkPrice), gstRate: Number(gstRate), minQuantity: Number(bulkMin) } : null;
 
   const save = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
     setSaving(true);
     setError('');
     try {
-      const body = { ...form, price, mrp, stock: Number(form.stock) };
+      const body = { ...fields, price, mrp, bulk, stock: Number(form.stock) };
       const { product } = existing
         ? await api<{ product: Product }>(`/admin/products/${existing.id}`, { method: 'PUT', body })
         : await api<{ product: Product }>('/admin/products', { method: 'POST', body });
@@ -411,7 +427,7 @@ function ProductEditor({ id, products, productSaved, notify }: EditorProps & { i
           <div className="space-y-5">
             <Section title="Price and stock">
               <div className="grid grid-cols-2 gap-4">
-                <TextField name="price" label="Price (₹)" required type="number" inputMode="numeric" min={1} step={1} value={form.price} onChange={edit('price')} />
+                <TextField name="price" label="Retail price (₹)" required type="number" inputMode="numeric" min={1} step={1} value={form.price} onChange={edit('price')} hint="GST included" />
                 <TextField name="mrp" label="MRP (₹)" type="number" inputMode="numeric" min={1} step={1} value={form.mrp} onChange={edit('mrp')} hint="Empty if none" />
                 <TextField
                   name="unit"
@@ -433,6 +449,88 @@ function ProductEditor({ id, products, productSaved, notify }: EditorProps & { i
                   <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">In the store</p>
                   <Price product={{ price, mrp: mrp !== null && mrp > price ? mrp : null }} className="mt-1" />
                 </div>
+              )}
+            </Section>
+
+            <Section title="Bulk orders" description="Shoppers can switch to a bulk order on the product page: this price before GST, with the GST added at checkout.">
+              <label
+                className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${form.bulkOn ? 'border-brand bg-brand-soft/60' : 'border-slate-200 hover:border-brand'}`}
+              >
+                <input type="checkbox" checked={form.bulkOn} onChange={(event) => set('bulkOn', event.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-brand" />
+                <span>
+                  <span className="block text-sm font-semibold text-navy">Sell in bulk too</span>
+                  <span className="mt-0.5 block text-xs text-slate-500">{form.bulkOn ? 'Retail stays as it is.' : 'Off: sold retail only, at the price above.'}</span>
+                </span>
+              </label>
+              {bulk && (
+                <>
+                  <div className="mt-4 grid grid-cols-2 gap-4">
+                    <TextField
+                      name="bulkPrice"
+                      label="Bulk price (₹)"
+                      required
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      step={1}
+                      value={form.bulkPrice}
+                      onChange={edit('bulkPrice')}
+                      hint="A pack, before GST"
+                    />
+                    <TextField
+                      name="gstRate"
+                      label="GST (%)"
+                      required
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={MAX_GST}
+                      step={1}
+                      list="gst-rates"
+                      value={form.gstRate}
+                      onChange={edit('gstRate')}
+                      hint="Added at checkout"
+                    />
+                    <datalist id="gst-rates">
+                      {GST_RATES.map((rate: number) => (
+                        <option key={rate} value={rate} />
+                      ))}
+                    </datalist>
+                    <div className="col-span-2">
+                      <TextField
+                        name="bulkMin"
+                        label="Smallest bulk order (packs)"
+                        required
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        max={MAX_QUANTITY}
+                        step={1}
+                        value={form.bulkMin}
+                        onChange={edit('bulkMin')}
+                        placeholder="e.g. 10"
+                        hint={form.unit.trim() ? `Each pack is a ${form.unit.trim()}` : undefined}
+                      />
+                    </div>
+                  </div>
+                  {bulk.price > 0 && form.gstRate.trim() !== '' && (
+                    <div className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">A bulk pack in the store</p>
+                      <p className="mt-1">
+                        <strong className="text-lg text-slate-900">{formatPrice(bulk.price)}</strong> + {bulk.gstRate}% GST ={' '}
+                        <strong className="text-slate-900">{formatPrice(bulk.price + gstFor(bulk.price, bulk.gstRate))}</strong>
+                      </p>
+                      {bulk.minQuantity > 0 && (
+                        <p className="mt-0.5 text-xs">
+                          Smallest order, {bulk.minQuantity} packs: {formatPrice(bulk.price * bulk.minQuantity + gstFor(bulk.price * bulk.minQuantity, bulk.gstRate))} with GST
+                        </p>
+                      )}
+                      {price > 0 && bulk.price * (100 + bulk.gstRate) >= price * 100 && (
+                        <p className="mt-2 text-xs font-semibold text-amber-700">With GST, a bulk pack costs no less than retail ({formatPrice(price)}).</p>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </Section>
 

@@ -151,6 +151,7 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
       variant: 'Class 2',
       price: 75,
       mrp: null,
+      bulk: null,
       unit: 'Box of 50',
       badge: 'ISI marked',
       image: '/photos/mask-isi-class2.jpg',
@@ -395,8 +396,9 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
 
   // A product as the admin pages' form sends it: every field, photos main first.
   const formFor = product => ({
-    name: product.name, category: product.category, family: product.family ?? '', variant: product.variant ?? '', price: product.price, mrp: product.mrp, stock: product.stock,
-    unit: product.unit, badge: product.badge ?? '', description: product.description, photos: [product.image, ...product.gallery], features: product.features, specs: product.specs,
+    name: product.name, category: product.category, family: product.family ?? '', variant: product.variant ?? '', price: product.price, mrp: product.mrp, bulk: product.bulk,
+    stock: product.stock, unit: product.unit, badge: product.badge ?? '', description: product.description, photos: [product.image, ...product.gallery], features: product.features,
+    specs: product.specs,
   });
 
   test('admins edit every part of a product, and the store shows it at once', async () => {
@@ -430,6 +432,24 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
     }
   });
 
+  test('admins set how a product sells in bulk: all of its terms or none, and no dearer than the MRP with GST', async () => {
+    const [original] = await query('SELECT bulk_price, bulk_min_qty, gst_rate FROM products WHERE id = 4');
+    const { product: before } = (await call('/products/4')).body;
+    const save = bulk => call('/admin/products/4', { method: 'PUT', cookie, body: { ...formFor(before), bulk } });
+    try {
+      assert.equal(before.bulk, null, 'retail only until an admin sets bulk terms');
+      const terms = { price: 700, minQuantity: 5, gstRate: 12 };
+      assert.deepEqual((await save(terms)).body.product.bulk, terms);
+      assert.deepEqual((await call('/products/4')).body.product.bulk, terms, 'the store shows them at once');
+      for (const bulk of [{ ...terms, gstRate: 41 }, { ...terms, minQuantity: 0 }, { ...terms, minQuantity: 1000 }, { ...terms, price: '700' }, { ...terms, price: 2300 }, undefined, [terms]]) {
+        assert.equal((await save(bulk)).status, 400, `${JSON.stringify(bulk)} (₹2,300 + 12% is above the ₹2,500 MRP)`);
+      }
+      assert.equal((await save(null)).body.product.bulk, null, 'and back to retail only');
+    } finally {
+      await query('UPDATE products SET bulk_price = ?, bulk_min_qty = ?, gst_rate = ? WHERE id = 4', [original.bulk_price, original.bulk_min_qty, original.gst_rate]);
+    }
+  });
+
   test('admins upload photos and add products, numbered after the highest id', async () => {
     const png = Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), Buffer.from('test photo')]);
     const upload = (files, { as = cookie, header = true } = {}) => {
@@ -456,8 +476,8 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
 
       const [{ highest }] = await query('SELECT MAX(id) AS highest FROM products');
       const product = {
-        name: 'Test Specimen Bag', category: `Test Category ${stamp}`, family: '', variant: '', price: 120, mrp: null, stock: 25, unit: 'Pack of 100', badge: 'New',
-        description: 'Zip-lock specimen bags.', photos: uploaded.body.urls, features: ['Zip lock'], specs: [],
+        name: 'Test Specimen Bag', category: `Test Category ${stamp}`, family: '', variant: '', price: 120, mrp: null, bulk: { price: 100, minQuantity: 20, gstRate: 5 }, stock: 25,
+        unit: 'Pack of 100', badge: 'New', description: 'Zip-lock specimen bags.', photos: uploaded.body.urls, features: ['Zip lock'], specs: [],
       };
       const created = await call('/admin/products', { method: 'POST', cookie, body: product });
       added.push(created.body.product?.id);

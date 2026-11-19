@@ -1,14 +1,19 @@
 // A category's name: one of the store's own (data/categories.ts) or one an admin added with a product.
 export type Category = string;
 
+// How a product sells in bulk: a pack's price before GST, the GST percentage added on top, and the fewest packs
+// a bulk order takes. Retail prices (Product.price) include GST.
+export type BulkTerms = { price: number; gstRate: number; minQuantity: number };
+
 export type Product = {
   id: number;
   name: string;
   category: Category;
   family?: string; // the name shared by every size of the product, e.g. 'Disposable Syringe without Needle'
   variant?: string; // this size within its family, e.g. '2 ml'
-  price: number;
+  price: number; // retail, GST included
   mrp: number | null; // the printed MRP, shown struck through beside the price
+  bulk: BulkTerms | null; // null when it is sold retail only
   unit: string;
   stock: number; // how many can still be ordered
   badge?: string;

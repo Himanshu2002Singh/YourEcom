@@ -15,6 +15,9 @@ export const discountFor = (coupon: Coupon, subtotal: number): number => {
   return Math.min(off, coupon.maxDiscount ?? off, subtotal);
 };
 
+// The GST on an amount before tax at `rate` percent, to the nearest rupee.
+export const gstFor = (amount: number, rate: number): number => Math.round((amount * rate) / 100);
+
 export const formatPrice = (amount: number): string => `₹${amount.toLocaleString('en-IN')}`;
 
 // What one piece of a pack costs, as wholesale buyers compare rates: "₹6/piece" for a 'Box of 100' at ₹600,

@@ -50,7 +50,11 @@ CREATE TABLE IF NOT EXISTS products (
   gallery     JSON          NULL,       -- more photos after image, as a list
   description VARCHAR(1000) NOT NULL,
   features    JSON          NOT NULL,   -- short selling points, as a list
-  specs       JSON          NULL        -- the details table, as [label, value] rows: [["Needle", "Included, 24G"]]
+  specs       JSON          NULL,       -- the details table, as [label, value] rows: [["Needle", "Included, 24G"]]
+  -- Bulk orders, besides retail at the price (which includes GST): all three set, or all NULL for retail only.
+  bulk_price   INT          NULL,       -- a pack in a bulk order, before GST
+  bulk_min_qty INT          NULL,       -- the fewest packs a bulk order takes
+  gst_rate     TINYINT      NULL        -- the GST percentage added to the bulk price
 );
 
 -- Databases made before family, variant, mrp and gallery existed get those columns here.
@@ -70,6 +74,15 @@ SET @add_specs := IF(
 PREPARE add_specs FROM @add_specs;
 EXECUTE add_specs;
 DEALLOCATE PREPARE add_specs;
+
+-- And databases made before bulk orders get their columns here, with every product sold retail only.
+SET @add_bulk := IF(
+  (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'products' AND column_name = 'bulk_price') = 0,
+  'ALTER TABLE products ADD COLUMN bulk_price INT NULL, ADD COLUMN bulk_min_qty INT NULL, ADD COLUMN gst_rate TINYINT NULL',
+  'DO 0');
+PREPARE add_bulk FROM @add_bulk;
+EXECUTE add_bulk;
+DEALLOCATE PREPARE add_bulk;
 
 -- The storefront's products; the frontend loads them from GET /api/products. Photos are the client's own
 -- (frontend/public/photos), sent to us or on their IndiaMART listing. Products the client lists on IndiaMART
