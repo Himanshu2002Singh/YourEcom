@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { ChevronRight, ExternalLink, Heart, Mail, MapPin, Menu, Package, Phone, Search, ShoppingCart, UserRound, X } from 'lucide-react';
+import { BadgeCheck, ChevronRight, ExternalLink, Heart, Mail, MapPin, Menu, Package, Phone, Search, ShoppingCart, UserRound, X } from 'lucide-react';
 import { WhatsAppIcon } from '@/components/StoreShared';
+import { SUPPLY_TYPES } from '@/data/company';
 import { ADDRESS, EMAIL, GSTIN, INDIAMART_LINK, MAP_LINK, PHONE, PHONE_LINK, whatsAppLink } from '@/data/contact';
 import { categoryPath, groupByFamily, groupName, matchesSearch, storeCategories, type ProductGroup } from '@/lib/catalogue';
 import type { Category, Product, User } from '@/types/store';
@@ -174,6 +175,32 @@ export function Header({ cartCount, wishlistCount, openCart, user, products }: H
 
   return (
     <>
+      {/* A thin bar above the header, on every width: the number to call, and the client's IndiaMART profile, where
+          wholesale and government buyers check a supplier. It scrolls away; the header below stays. */}
+      <div className="bg-navy-dark text-xs text-blue-100 print:hidden">
+        <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-3 px-3 py-1.5 sm:px-4">
+          <a href={PHONE_LINK} className="flex items-center gap-1.5 whitespace-nowrap font-medium transition hover:text-white">
+            <Phone size={13} className="shrink-0" />
+            <span>
+              <span className="hidden sm:inline">Call / WhatsApp </span>
+              {PHONE}
+            </span>
+          </a>
+          <p className="hidden truncate md:block">{SUPPLY_TYPES.join(' · ')}</p>
+          <a
+            href={INDIAMART_LINK}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1.5 whitespace-nowrap rounded-full bg-white px-2.5 py-0.5 font-bold text-navy transition hover:bg-brand-soft"
+          >
+            <BadgeCheck size={14} className="shrink-0 text-leaf" />
+            <span>
+              <span className="hidden sm:inline">Find us on </span>IndiaMART
+            </span>
+            <ExternalLink size={12} className="shrink-0" />
+          </a>
+        </div>
+      </div>
       {/* Not sticky on short screens (phones in landscape), where it would cover a large part of the page. */}
       <header className="sticky top-0 z-30 bg-navy text-white shadow-md print:hidden [@media(max-height:500px)]:static">
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-1 gap-y-2 px-2 py-2 sm:gap-x-2 sm:px-4 lg:flex-nowrap">
@@ -182,10 +209,6 @@ export function Header({ cartCount, wishlistCount, openCart, user, products }: H
           </button>
           <Logo onClick={closeMenu} />
           <SearchBox products={products} className="order-last w-full lg:order-none lg:mx-3 lg:w-auto lg:flex-1" />
-          <a href={PHONE_LINK} className={`${headerItem} hidden flex-col items-start text-xs leading-tight xl:flex`}>
-            <span className="text-blue-200">Call / WhatsApp</span>
-            <span className="text-sm font-bold">{PHONE}</span>
-          </a>
           <Link to={accountPath} className={`${headerItem} ml-auto gap-1.5 lg:ml-0`} aria-label={user ? `My account (${greeting})` : 'Sign in'}>
             <UserRound size={22} className="sm:hidden" />
             <span className="hidden flex-col text-xs leading-tight sm:flex">
