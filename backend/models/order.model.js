@@ -29,7 +29,7 @@ async function takeFromStock(connection, items) {
   for (const { id, quantity } of items) await connection.execute('UPDATE products SET stock = stock - ? WHERE id = ?', [quantity, id]);
 }
 
-// order: { items, subtotal, discount, couponCode, deliveryFee, total, delivery, paymentMethod }
+// order: { items, subtotal, discount, couponCode, gst, deliveryFee, total, delivery, paymentMethod }
 // (see services/pricing.service.js). With a coupon, the customer's row is locked first so their
 // orders are placed one at a time, and the code is checked again. In the rare case an order
 // number is taken, another is drawn.
@@ -44,8 +44,11 @@ export async function create(userId, order) {
       const number = orderNumber();
       try {
         await connection.execute(
-          'INSERT INTO orders (id, user_id, items, subtotal, discount, coupon_code, delivery_fee, total, delivery, payment_method) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [number, userId, JSON.stringify(order.items), order.subtotal, order.discount, order.couponCode, order.deliveryFee, order.total, JSON.stringify(order.delivery), order.paymentMethod],
+          'INSERT INTO orders (id, user_id, items, subtotal, discount, coupon_code, gst, delivery_fee, total, delivery, payment_method) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [
+            number, userId, JSON.stringify(order.items), order.subtotal, order.discount, order.couponCode, order.gst, order.deliveryFee, order.total,
+            JSON.stringify(order.delivery), order.paymentMethod,
+          ],
         );
         return number;
       } catch (error) {

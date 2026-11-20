@@ -6,8 +6,8 @@ import { HttpError } from '../utils/HttpError.js';
 import { cleanOrder, cleanStatus } from '../validators/order.validator.js';
 import { orderView } from '../views/order.view.js';
 
-// POST /api/orders { items: [{ id, quantity }], delivery, paymentMethod, couponCode? }. Prices,
-// the discount, the delivery fee and the totals are worked out here; any the browser sends are ignored.
+// POST /api/orders { items: [{ id, quantity, bulk? }], delivery, paymentMethod, couponCode? }. Prices, the GST
+// on bulk items, the discount, the delivery fee and the totals are worked out here; any the browser sends are ignored.
 export async function placeOrder(request, response) {
   const { items, delivery, paymentMethod, couponCode } = cleanOrder(request.body);
   const coupon = couponCode && await Coupon.findUsable(request.user.id, couponCode);

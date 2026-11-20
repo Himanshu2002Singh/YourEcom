@@ -265,10 +265,11 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
     assert.ok(Math.abs(Date.parse(placedAt) - Date.now()) < 60_000, `placedAt ${placedAt} should be now`);
     assert.deepEqual(order, {
       email,
-      items: [{ id: 4, name: 'IV Infusion Set', price: 899, unit: 'Pack of 10', image, quantity: 1 }],
+      items: [{ id: 4, name: 'IV Infusion Set', price: 899, unit: 'Pack of 10', image, quantity: 1, bulk: false, gstRate: null, gst: 0 }],
       subtotal: 899,
       discount: 0,
       couponCode: null,
+      gst: 0,
       deliveryFee: 99,
       total: 998,
       delivery,
@@ -432,19 +433,37 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
     }
   });
 
-  test('admins set how a product sells in bulk: all of its terms or none, and no dearer than the MRP with GST', async () => {
+  test('a bulk order is the bulk price plus GST, from the smallest bulk order, and coupons stay with retail items', async () => {
     const [original] = await query('SELECT bulk_price, bulk_min_qty, gst_rate FROM products WHERE id = 4');
     const { product: before } = (await call('/products/4')).body;
-    const save = bulk => call('/admin/products/4', { method: 'PUT', cookie, body: { ...formFor(before), bulk } });
+    const save = bulk => call('/admin/products/4', { method: 'PUT', cookie, body: { ...formFor(before), stock: 50, bulk } });
+    // A customer of its own, whose orders don't use up the other tests' allowance of orders.
+    const wholesaler = (await call('/auth/register', { method: 'POST', body: { name: 'Bulk Buyer', email: `test-${stamp}-bulk@example.com`, password: 'bulk-buyer-password' } })).cookie;
+    const order = (items, couponCode) => call('/orders', { method: 'POST', cookie: wholesaler, body: { items, delivery, paymentMethod: 'cod', couponCode } });
     try {
       assert.equal(before.bulk, null, 'retail only until an admin sets bulk terms');
+      assert.deepEqual((await order([{ id: 4, quantity: 5, bulk: true }])).body, { error: 'IV Infusion Set isn’t sold in bulk any more. Change it to a retail order in your cart.' });
+
       const terms = { price: 700, minQuantity: 5, gstRate: 12 };
       assert.deepEqual((await save(terms)).body.product.bulk, terms);
       assert.deepEqual((await call('/products/4')).body.product.bulk, terms, 'the store shows them at once');
       for (const bulk of [{ ...terms, gstRate: 41 }, { ...terms, minQuantity: 0 }, { ...terms, minQuantity: 1000 }, { ...terms, price: '700' }, { ...terms, price: 2300 }, undefined, [terms]]) {
         assert.equal((await save(bulk)).status, 400, `${JSON.stringify(bulk)} (₹2,300 + 12% is above the ₹2,500 MRP)`);
       }
-      assert.equal((await save(null)).body.product.bulk, null, 'and back to retail only');
+
+      assert.deepEqual((await order([{ id: 4, quantity: 4, bulk: true }])).body, { error: 'A bulk order of IV Infusion Set is at least 5 × Pack of 10.' });
+      assert.equal((await order([{ id: 4, quantity: 5, bulk: 'yes' }])).status, 400);
+      const placed = await order([{ id: 4, quantity: 5, bulk: true }, { id: 6, quantity: 1 }]);
+      assert.equal(placed.status, 201);
+      const { items, subtotal, discount, gst, deliveryFee, total } = placed.body.order;
+      assert.deepEqual(
+        items.map(item => [item.id, item.price, item.quantity, item.bulk, item.gstRate, item.gst]),
+        [[4, 700, 5, true, 12, 420], [6, 179, 1, false, null, 0]],
+      );
+      assert.deepEqual({ subtotal, discount, gst, deliveryFee, total }, { subtotal: 3679, discount: 0, gst: 420, deliveryFee: 0, total: 4099 }, '5 × ₹700 + ₹179, and 12% on the ₹3,500');
+
+      assert.deepEqual((await order([{ id: 4, quantity: 5, bulk: true }], 'SAVE100')).body, { error: 'SAVE100 is for retail items. Bulk orders already have the wholesale rate.' });
+      assert.deepEqual((await order([{ id: 4, quantity: 5, bulk: true }, { id: 6, quantity: 1 }], 'SAVE100')).body, { error: 'SAVE100 is for orders of ₹1,000 or more in retail items.' });
     } finally {
       await query('UPDATE products SET bulk_price = ?, bulk_min_qty = ?, gst_rate = ? WHERE id = 4', [original.bulk_price, original.bulk_min_qty, original.gst_rate]);
     }

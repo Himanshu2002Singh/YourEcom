@@ -20,19 +20,21 @@ export function cleanCouponCode(code) {
   return clean;
 }
 
-// Cart lines as the storefront keeps them: [{ id, quantity }]. Nothing else on a line is
-// read; prices come from the database (services/pricing.service.js).
+// Cart lines as the storefront keeps them: [{ id, quantity, bulk? }], bulk true for a bulk order of the product
+// and false or left out for retail. Nothing else on a line is read; prices come from the database
+// (services/pricing.service.js).
 function cleanItems(items) {
   if (!Array.isArray(items) || !items.length) throw new HttpError(400, 'Your cart is empty.');
   if (items.length > MAX_LINES) throw new HttpError(400, `An order can have up to ${MAX_LINES} different products.`);
   const ids = new Set();
   return items.map(item => {
-    const { id, quantity } = item ?? {};
+    const { id, quantity, bulk = false } = item ?? {};
     if (!Number.isInteger(id) || id < 1) throw new HttpError(400, 'Each item needs the id of a product.');
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QUANTITY) throw new HttpError(400, `Quantity must be between 1 and ${MAX_QUANTITY}.`);
+    if (typeof bulk !== 'boolean') throw new HttpError(400, 'Mark each item as a bulk order or not with true or false.');
     if (ids.has(id)) throw new HttpError(400, 'List each product once, with its full quantity.');
     ids.add(id);
-    return { id, quantity };
+    return { id, quantity, bulk };
   });
 }
 

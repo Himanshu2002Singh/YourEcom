@@ -1,6 +1,8 @@
 // An order shaped like the storefront's Order (frontend/src/types/store.ts). Its items are
-// the snapshots taken when it was placed, not the products as they are now.
-const itemView = ({ id, name, price, unit, image, quantity }) => ({ id, name, price, unit, image, quantity });
+// the snapshots taken when it was placed, not the products as they are now. An item's price is a
+// retail price with GST, or on a bulk item (bulk: true) the bulk price before the GST in `gst`. Orders
+// placed before bulk orders existed have only retail items.
+const itemView = ({ id, name, price, unit, image, quantity, bulk = false, gstRate = null, gst = 0 }) => ({ id, name, price, unit, image, quantity, bulk, gstRate, gst });
 const deliveryView = ({ name, phone, address, city, pincode }) => ({ name, phone, address, city, pincode });
 
 // `user` is the customer who placed it (every order route is for the customer's own orders).
@@ -14,6 +16,7 @@ export function orderView(row, user) {
     subtotal: row.subtotal,
     discount: row.discount,
     couponCode: row.coupon_code,
+    gst: row.gst,
     deliveryFee: row.delivery_fee,
     total: row.total,
     delivery: deliveryView(row.delivery),

@@ -2,7 +2,7 @@
 // and session cookies.
 import assert from 'node:assert/strict';
 import { before, test } from 'node:test';
-import { deliveryFeeFor, discountFor } from '../services/pricing.service.js';
+import { deliveryFeeFor, discountFor, gstFor } from '../services/pricing.service.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
 import { readSession, startSession } from '../utils/session.js';
 import { photoType } from '../utils/uploads.js';
@@ -24,14 +24,26 @@ test('delivery is free from a ₹2,500 subtotal and ₹99 below it', () => {
   assert.equal(deliveryFeeFor(2500), 0);
 });
 
-test('checkout input is trimmed, and quantities go up to 999', () => {
+test('GST on a bulk order is rounded to the nearest rupee', () => {
+  assert.equal(gstFor(2500, 12), 300);
+  assert.equal(gstFor(555, 5), 28, '₹27.75');
+  assert.equal(gstFor(185, 18), 33, '₹33.30');
+  assert.equal(gstFor(1000, 0), 0);
+});
+
+test('checkout input is trimmed, quantities go up to 999, and a line is retail unless it says bulk', () => {
   assert.deepEqual(cleanOrder(order({ quantity: MAX_QUANTITY })), {
-    items: [{ id: 1, quantity: 999 }],
+    items: [{ id: 1, quantity: 999, bulk: false }],
     delivery: { name: 'Aarav Singh', phone: '98765 43210', address: '12 MG Road', city: 'New Delhi', pincode: '110059' },
     paymentMethod: 'cod',
     couponCode: null,
   });
+  assert.deepEqual(cleanOrder({ ...order(), items: [{ id: 1, quantity: 10, bulk: true }, { id: 2, quantity: 1, bulk: false }] }).items, [
+    { id: 1, quantity: 10, bulk: true },
+    { id: 2, quantity: 1, bulk: false },
+  ]);
   assert.throws(() => cleanOrder(order({ quantity: 1.5 })), { status: 400 });
+  for (const bulk of ['true', 1, null]) assert.throws(() => cleanOrder({ ...order(), items: [{ id: 1, quantity: 10, bulk }] }), { status: 400 }, String(bulk));
 });
 
 test('a coupon takes a percentage (rounded down, up to its cap) or a flat amount, never more than the subtotal', () => {

@@ -455,12 +455,13 @@ INSERT IGNORE INTO products (id, name, category, family, variant, price, mrp, un
 CREATE TABLE IF NOT EXISTS orders (
   id             CHAR(10)                       NOT NULL PRIMARY KEY,   -- order number: 'YE' + 8 digits
   user_id        CHAR(36)                       NOT NULL,
-  items          JSON                           NOT NULL,   -- [{ id, name, price, unit, image, quantity }]
-  subtotal       INT                            NOT NULL,
-  discount       INT                            NOT NULL DEFAULT 0,   -- what coupon_code took off the subtotal
+  items          JSON                           NOT NULL,   -- [{ id, name, price, unit, image, quantity, bulk, gstRate, gst }]
+  subtotal       INT                            NOT NULL,   -- every item at its price: retail ones with GST, bulk ones before it
+  discount       INT                            NOT NULL DEFAULT 0,   -- what coupon_code took off the retail items
   coupon_code    VARCHAR(30)                    NULL,
+  gst            INT                            NOT NULL DEFAULT 0,   -- the GST added to the bulk items
   delivery_fee   INT                            NOT NULL,
-  total          INT                            NOT NULL,   -- subtotal - discount + delivery_fee
+  total          INT                            NOT NULL,   -- subtotal - discount + gst + delivery_fee
   delivery       JSON                           NOT NULL,   -- { name, phone, address, city, pincode }
   payment_method ENUM('online', 'cod')          NOT NULL,
   status         ENUM('Processing', 'Shipped', 'Delivered', 'Cancelled') NOT NULL DEFAULT 'Processing',
@@ -478,6 +479,15 @@ SET @add_shipped := IF(
 PREPARE add_shipped FROM @add_shipped;
 EXECUTE add_shipped;
 DEALLOCATE PREPARE add_shipped;
+
+-- Databases made before bulk orders get the GST column here; older orders had no GST added.
+SET @add_gst := IF(
+  (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'orders' AND column_name = 'gst') = 0,
+  'ALTER TABLE orders ADD COLUMN gst INT NOT NULL DEFAULT 0 AFTER coupon_code',
+  'DO 0');
+PREPARE add_gst FROM @add_gst;
+EXECUTE add_gst;
+DEALLOCATE PREPARE add_gst;
 
 -- Discount codes for the checkout. Each customer can use a code once; a cancelled order gives
 -- it back. To retire a code, set active to FALSE (orders keep their own copy of the code).
