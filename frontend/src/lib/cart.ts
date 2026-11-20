@@ -1,14 +1,17 @@
 import type { CartLine } from '@/types/store';
 
-export const MAX_QUANTITY = 999;
+export const MAX_QUANTITY = 999; // packs on a retail line
+// A bulk line has no limit but the stock, which never goes above this (backend/validators/order.validator.js).
+export const MAX_BULK_QUANTITY = 1_000_000;
 
-// Sets a product's quantity in the cart: 0 removes the line, anything above MAX_QUANTITY is capped. `bulk` says
-// whether it is a bulk order; left out, the line stays as it is.
+// Sets a product's quantity in the cart: 0 removes the line, anything above the line's limit is capped. `bulk`
+// says whether it is a bulk order; left out, the line stays as it is.
 export const setLineQuantity = (lines: CartLine[], id: number, quantity: number, bulk?: boolean): CartLine[] => {
-  const next = Math.min(Math.max(Math.floor(quantity), 0), MAX_QUANTITY);
-  if (next === 0) return lines.filter((line: CartLine) => line.id !== id);
   const current = lines.find((line: CartLine) => line.id === id);
-  const updated: CartLine = (bulk ?? current?.bulk) ? { id, quantity: next, bulk: true } : { id, quantity: next };
+  const isBulk = bulk ?? Boolean(current?.bulk);
+  const next = Math.min(Math.max(Math.floor(quantity), 0), isBulk ? MAX_BULK_QUANTITY : MAX_QUANTITY);
+  if (next === 0) return lines.filter((line: CartLine) => line.id !== id);
+  const updated: CartLine = isBulk ? { id, quantity: next, bulk: true } : { id, quantity: next };
   return current ? lines.map((line: CartLine) => (line.id === id ? updated : line)) : [...lines, updated];
 };
 

@@ -2,7 +2,10 @@ import { HttpError } from '../utils/HttpError.js';
 
 // The storefront's rules: frontend/src/lib/cart.ts (quantities) and
 // frontend/src/pages/CheckoutPage.tsx (delivery details).
-export const MAX_QUANTITY = 999;
+export const MAX_QUANTITY = 999; // packs on a retail line
+// A bulk line has no limit of its own: stock is checked when the order is placed, and stock never goes above
+// this (validators/admin.validator.js), so it only turns away absurd numbers.
+export const MAX_BULK_QUANTITY = 1_000_000;
 const MAX_LINES = 50;
 const PAYMENT_METHODS = ['online', 'cod'];
 export const STATUSES = ['Processing', 'Shipped', 'Delivered', 'Cancelled'];
@@ -30,8 +33,9 @@ function cleanItems(items) {
   return items.map(item => {
     const { id, quantity, bulk = false } = item ?? {};
     if (!Number.isInteger(id) || id < 1) throw new HttpError(400, 'Each item needs the id of a product.');
-    if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QUANTITY) throw new HttpError(400, `Quantity must be between 1 and ${MAX_QUANTITY}.`);
     if (typeof bulk !== 'boolean') throw new HttpError(400, 'Mark each item as a bulk order or not with true or false.');
+    const max = bulk ? MAX_BULK_QUANTITY : MAX_QUANTITY;
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > max) throw new HttpError(400, `Quantity must be between 1 and ${max.toLocaleString('en-IN')}.`);
     if (ids.has(id)) throw new HttpError(400, 'List each product once, with its full quantity.');
     ids.add(id);
     return { id, quantity, bulk };

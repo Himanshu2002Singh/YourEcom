@@ -116,6 +116,7 @@ export function CartDrawer({ open, cart, totals, setOpen, setQuantity, checkout 
                         label={product.name}
                         max={product.stock}
                         min={bulk ? product.bulk?.minQuantity : undefined}
+                        bulk={Boolean(bulk)}
                         size="sm"
                         tone="light"
                       />

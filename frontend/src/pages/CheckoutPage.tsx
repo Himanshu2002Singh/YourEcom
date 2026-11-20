@@ -283,6 +283,7 @@ function OrderSummary({ cart, totals: { subtotal, retailSubtotal, gst, discount,
                   label={product.name}
                   max={product.stock}
                   min={bulk ? product.bulk?.minQuantity : undefined}
+                  bulk={Boolean(bulk)}
                   size="sm"
                   tone="dark"
                 />

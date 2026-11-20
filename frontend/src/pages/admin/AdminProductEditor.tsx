@@ -7,7 +7,7 @@ import { TextField } from '@/components/TextField';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { useStoreInfo } from '@/hooks/useStoreInfo';
 import { api, type ApiError } from '@/lib/api';
-import { MAX_QUANTITY } from '@/lib/cart';
+import { MAX_BULK_QUANTITY } from '@/lib/cart';
 import { byCategoryOrder } from '@/lib/catalogue';
 import { formatPrice, gstFor, perItemPrice } from '@/lib/pricing';
 import type { Product } from '@/types/store';
@@ -507,7 +507,7 @@ function ProductEditor({ id, products, productSaved, notify }: EditorProps & { i
                         type="number"
                         inputMode="numeric"
                         min={1}
-                        max={MAX_QUANTITY}
+                        max={MAX_BULK_QUANTITY}
                         step={1}
                         value={form.bulkMin}
                         onChange={edit('bulkMin')}

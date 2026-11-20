@@ -98,7 +98,7 @@ export function AddToCart({ product, lineOf, addToCart, setQuantity }: Pick<Shop
     const bulk = line.bulk ? product.bulk : null;
     return (
       <div className="flex items-center justify-between gap-2">
-        <QuantityStepper quantity={line.quantity} onChange={(next: number) => setQuantity(product.id, next)} label={product.name} max={product.stock} min={bulk?.minQuantity} />
+        <QuantityStepper quantity={line.quantity} onChange={(next: number) => setQuantity(product.id, next)} label={product.name} max={product.stock} min={bulk?.minQuantity} bulk={Boolean(bulk)} />
         <span className="text-xs font-bold text-deal">{bulk ? 'Bulk order' : 'In cart'}</span>
       </div>
     );

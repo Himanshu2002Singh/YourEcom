@@ -1,12 +1,12 @@
 import { HttpError } from '../utils/HttpError.js';
-import { MAX_QUANTITY, cleanStatus } from './order.validator.js';
+import { MAX_BULK_QUANTITY, cleanStatus } from './order.validator.js';
 import { MAX_CATEGORY } from './product.validator.js';
 
 // Input to the admin pages' API (routes/admin.routes.js).
 export const ORDERS_PAGE_SIZE = 20;
 const MAX_RUPEES = 10_000_000; // ₹1 crore, far above any pack
 const MAX_GST = 40; // the highest GST rate there is
-const MAX_STOCK = 1_000_000;
+const MAX_STOCK = MAX_BULK_QUANTITY; // a bulk order may take all of it
 const MAX_PHOTOS = 10;
 const MAX_FEATURES = 8;
 const MAX_SPECS = 20;
@@ -61,7 +61,9 @@ function cleanBulk(bulk, mrp) {
   const { price, minQuantity, gstRate } = bulk;
   if (!wholeNumber(price, 1, MAX_RUPEES)) throw new HttpError(400, 'The bulk price must be a whole number of rupees, at least ₹1.');
   if (!wholeNumber(gstRate, 0, MAX_GST)) throw new HttpError(400, `GST must be a whole percentage from 0 to ${MAX_GST}.`);
-  if (!wholeNumber(minQuantity, 1, MAX_QUANTITY)) throw new HttpError(400, `The smallest bulk order must be a whole number of packs from 1 to ${MAX_QUANTITY}.`);
+  if (!wholeNumber(minQuantity, 1, MAX_BULK_QUANTITY)) {
+    throw new HttpError(400, `The smallest bulk order must be a whole number of packs from 1 to ${MAX_BULK_QUANTITY.toLocaleString('en-IN')}.`);
+  }
   if (mrp !== null && price * (100 + gstRate) > mrp * 100) {
     throw new HttpError(400, `With ${gstRate}% GST a bulk pack would cost more than its MRP of ₹${mrp.toLocaleString('en-IN')}. Lower the bulk price.`);
   }

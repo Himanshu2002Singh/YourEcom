@@ -7,7 +7,7 @@ import { hashPassword, verifyPassword } from '../utils/password.js';
 import { readSession, startSession } from '../utils/session.js';
 import { photoType } from '../utils/uploads.js';
 import { cleanOrderQuery, cleanProduct, cleanStatusChange } from '../validators/admin.validator.js';
-import { MAX_QUANTITY, cleanCouponCode, cleanOrder, cleanStatus } from '../validators/order.validator.js';
+import { MAX_BULK_QUANTITY, MAX_QUANTITY, cleanCouponCode, cleanOrder, cleanStatus } from '../validators/order.validator.js';
 
 before(() => {
   process.env.SESSION_SECRET = 'test-secret-that-is-long-enough-for-hmac-signing';
@@ -31,7 +31,7 @@ test('GST on a bulk order is rounded to the nearest rupee', () => {
   assert.equal(gstFor(1000, 0), 0);
 });
 
-test('checkout input is trimmed, quantities go up to 999, and a line is retail unless it says bulk', () => {
+test('checkout input is trimmed, retail quantities go up to 999, bulk ones past it, and a line is retail unless it says bulk', () => {
   assert.deepEqual(cleanOrder(order({ quantity: MAX_QUANTITY })), {
     items: [{ id: 1, quantity: 999, bulk: false }],
     delivery: { name: 'Aarav Singh', phone: '98765 43210', address: '12 MG Road', city: 'New Delhi', pincode: '110059' },
@@ -43,6 +43,11 @@ test('checkout input is trimmed, quantities go up to 999, and a line is retail u
     { id: 2, quantity: 1, bulk: false },
   ]);
   assert.throws(() => cleanOrder(order({ quantity: 1.5 })), { status: 400 });
+  assert.throws(() => cleanOrder(order({ quantity: MAX_QUANTITY + 1 })), { status: 400, message: 'Quantity must be between 1 and 999.' }, 'retail stops at 999');
+  const bulkLine = quantity => cleanOrder({ ...order(), items: [{ id: 1, quantity, bulk: true }] }).items[0].quantity;
+  assert.equal(bulkLine(25_000), 25_000, 'a bulk order is limited only by the stock');
+  assert.equal(bulkLine(MAX_BULK_QUANTITY), MAX_BULK_QUANTITY);
+  assert.throws(() => bulkLine(MAX_BULK_QUANTITY + 1), { status: 400, message: 'Quantity must be between 1 and 10,00,000.' });
   for (const bulk of ['true', 1, null]) assert.throws(() => cleanOrder({ ...order(), items: [{ id: 1, quantity: 10, bulk }] }), { status: 400 }, String(bulk));
 });
 
@@ -110,10 +115,11 @@ test('a product needs a name, category, price no higher than its MRP, pack, desc
   assert.equal(cleanProduct({ ...product, mrp: null, bulk: { ...bulk, price: 5000 } }).bulk_price, 5000, 'no MRP, no ceiling');
   const invalidBulk = [
     undefined, 'yes', [bulk], { ...bulk, price: 0 }, { ...bulk, price: 249.5 }, { ...bulk, gstRate: -1 }, { ...bulk, gstRate: 41 }, { ...bulk, gstRate: '5' }, { ...bulk, minQuantity: 0 },
-    { ...bulk, minQuantity: MAX_QUANTITY + 1 }, { ...bulk, price: 477, gstRate: 5 },
+    { ...bulk, minQuantity: MAX_BULK_QUANTITY + 1 }, { ...bulk, price: 477, gstRate: 5 },
   ];
   for (const terms of invalidBulk) assert.throws(() => cleanProduct({ ...product, bulk: terms }), { status: 400 }, `${JSON.stringify(terms)} (₹477 + 5% is above the ₹500 MRP)`);
   assert.equal(cleanProduct({ ...product, bulk: { ...bulk, price: 476 } }).bulk_price, 476, '₹476 + 5% is ₹499.80, under the MRP');
+  assert.equal(cleanProduct({ ...product, stock: 50_000, bulk: { ...bulk, minQuantity: 5000 } }).bulk_min_qty, 5000, 'a bulk minimum may pass 999');
   assert.equal(cleanProduct({ ...product, mrp: 280 }).mrp, 280, 'MRP may equal the price');
   assert.equal(cleanProduct({ ...product, mrp: null }).mrp, null);
   assert.deepEqual(Object.values(cleanProduct({ ...product, family: ' ', variant: '' })).slice(2, 4), [null, null], 'a product in one size has neither');

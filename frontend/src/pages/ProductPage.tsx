@@ -124,6 +124,7 @@ export function ProductPage({ products, openCart, user, reloadProducts, ...shop 
               label={product.name}
               max={product.stock}
               min={terms.minQuantity}
+              bulk
               removable={false}
               tone="light"
             />
@@ -149,7 +150,7 @@ export function ProductPage({ products, openCart, user, reloadProducts, ...shop 
       </div>
       {quantity > 0 && (
         <div className="mt-3 flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
-          <QuantityStepper quantity={quantity} onChange={(next: number) => setQuantity(product.id, next)} label={product.name} max={product.stock} min={bulk ? terms?.minQuantity : 1} />
+          <QuantityStepper quantity={quantity} onChange={(next: number) => setQuantity(product.id, next)} label={product.name} max={product.stock} min={bulk ? terms?.minQuantity : 1} bulk={Boolean(bulk)} />
           <p className="text-right text-sm text-slate-600">
             {bulk ? 'Bulk order in cart' : 'In your cart'}:{' '}
             <strong className="text-slate-900">{formatPrice(lineTotal(priceLine(product, quantity, bulk)))}</strong>
