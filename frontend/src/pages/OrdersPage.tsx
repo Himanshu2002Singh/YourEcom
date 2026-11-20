@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { ChevronRight, PackageOpen, ShoppingBag, Truck } from 'lucide-react';
 import { OrderActions, OrderItemList, StatusPill } from '@/components/OrderParts';
 import { usePageTitle } from '@/hooks/usePageTitle';
-import { deliveryLabels, formatDate, paymentLabels } from '@/lib/format';
+import { deliveryLabels, formatDate, paymentStatusLabels } from '@/lib/format';
 import { formatPrice } from '@/lib/pricing';
 import type { Order } from '@/types/store';
 
@@ -67,7 +67,10 @@ export function OrdersPage({ orders, buyAgain, cancelOrder }: OrdersPageProps) {
                     <StatusPill status={order.status} />
                   </div>
                   <p className="mt-2 text-sm font-semibold text-slate-400">
-                    Placed on {formatDate(order.placedAt)} · {paymentLabels[order.paymentMethod]}
+                    Placed on {formatDate(order.placedAt)} ·{' '}
+                    <span className={order.paymentStatus === 'pending' && order.status !== 'Cancelled' ? 'font-semibold text-amber-700' : ''}>
+                      {paymentStatusLabels[order.paymentStatus]}
+                    </span>
                   </p>
                 </div>
                 <div className="sm:text-right">

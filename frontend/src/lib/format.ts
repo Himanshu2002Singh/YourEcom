@@ -1,4 +1,4 @@
-import type { OrderStatus, PaymentMethod } from '@/types/store';
+import type { OrderStatus, PaymentStatus } from '@/types/store';
 
 // How dates and order details are written out for customers.
 export const formatDate = (iso: string): string => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -6,7 +6,7 @@ export const formatDate = (iso: string): string => new Date(iso).toLocaleDateStr
 export const formatDateTime = (iso: string): string =>
   new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 
-export const paymentLabels: Record<PaymentMethod, string> = { online: 'Card / UPI', cod: 'Cash on delivery' };
+export const paymentStatusLabels: Record<PaymentStatus, string> = { cod: 'Cash on delivery', pending: 'Awaiting payment', paid: 'Paid online' };
 
 export const deliveryLabels: Record<OrderStatus, string> = {
   Processing: 'Delivering to',

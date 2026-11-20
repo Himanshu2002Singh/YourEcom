@@ -8,7 +8,7 @@ import { TextField } from '@/components/TextField';
 import { useApiData } from '@/hooks/useApiData';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { api, type ApiError } from '@/lib/api';
-import { formatDateTime, paymentLabels } from '@/lib/format';
+import { formatDateTime, paymentStatusLabels } from '@/lib/format';
 import { formatPrice } from '@/lib/pricing';
 import type { AdminOrder, OrderItem } from '@/types/store';
 
@@ -237,14 +237,28 @@ export function AdminOrderPage({ notify, stockChanged }: { notify: Notify; stock
           </section>
           <section className={card}>
             <h2 className="text-lg font-semibold text-navy">Payment</h2>
-            <p className="mt-3 text-sm font-semibold text-slate-700">{paymentLabels[order.paymentMethod]}</p>
-            {order.paymentMethod === 'cod' ? (
-              <p className="mt-1 text-sm text-slate-500">Collect {formatPrice(order.total)} in cash at delivery.</p>
-            ) : (
+            <p className="mt-3 text-sm font-semibold text-slate-700">{paymentStatusLabels[order.paymentStatus]}</p>
+            {order.paymentStatus === 'cod' && <p className="mt-1 text-sm text-slate-500">Collect {formatPrice(order.total)} in cash at delivery.</p>}
+            {order.paymentStatus === 'pending' && (
               <p className="mt-2 flex gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 print:hidden">
                 <CircleAlert size={17} className="mt-0.5 shrink-0" />
-                Online payments aren’t connected yet, so nothing was charged. Collect {formatPrice(order.total)} before you ship.
+                {order.status === 'Cancelled'
+                  ? 'Cancelled before it was paid, so nothing was charged.'
+                  : `The customer hasn’t paid the ${formatPrice(order.total)} online yet. Don’t ship it until it shows as paid.`}
               </p>
+            )}
+            {order.paymentStatus === 'paid' && (
+              <>
+                <p className="mt-1 break-all text-sm text-slate-500">
+                  {formatPrice(order.total)} through Razorpay · payment {order.paymentId}
+                </p>
+                {order.status === 'Cancelled' && (
+                  <p className="mt-2 flex gap-2 rounded-lg bg-rose-50 p-3 text-sm text-rose-700 print:hidden">
+                    <CircleAlert size={17} className="mt-0.5 shrink-0" />
+                    Cancelled after it was paid: refund {formatPrice(order.total)} from the Razorpay Dashboard, under Payments, {order.paymentId}.
+                  </p>
+                )}
+              </>
             )}
           </section>
         </div>

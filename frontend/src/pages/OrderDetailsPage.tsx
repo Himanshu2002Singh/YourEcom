@@ -1,14 +1,20 @@
+import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { ArrowLeft, Check, MapPin, Printer, Receipt, X } from 'lucide-react';
 import { OrderActions, OrderItemList, StatusPill } from '@/components/OrderParts';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { useStoreInfo } from '@/hooks/useStoreInfo';
-import { deliveryLabels, formatDateTime, paymentLabels } from '@/lib/format';
+import { deliveryLabels, formatDateTime, paymentStatusLabels } from '@/lib/format';
 import { formatPrice } from '@/lib/pricing';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import type { Order, OrderItem } from '@/types/store';
 
-type OrderDetailsPageProps = { orders: Order[]; buyAgain: (order: Order) => void; cancelOrder: (id: string) => Promise<void> };
+type OrderDetailsPageProps = {
+  orders: Order[];
+  buyAgain: (order: Order) => void;
+  cancelOrder: (id: string) => Promise<void>;
+  payOrder: (order: Order) => Promise<Order>;
+};
 type Step = { label: string; detail?: string; state: 'done' | 'current' | 'upcoming' | 'cancelled' };
 
 const stepStyles: Record<Step['state'], string> = {
@@ -17,6 +23,41 @@ const stepStyles: Record<Step['state'], string> = {
   upcoming: 'bg-slate-100 text-slate-400',
   cancelled: 'bg-rose-100 text-rose-600',
 };
+
+// How the order is paid. An order paid online that is still waiting for its payment can be paid from here; one
+// cancelled after it was paid says the money is coming back.
+function OrderPayment({ order, payOrder }: { order: Order; payOrder: (order: Order) => Promise<Order> }) {
+  const [paying, setPaying] = useState(false);
+  const cancelled = order.status === 'Cancelled';
+  const payNow = async (): Promise<void> => {
+    setPaying(true);
+    try {
+      await payOrder(order);
+    } finally {
+      setPaying(false);
+    }
+  };
+  return (
+    <div className="mt-4 text-sm">
+      <p className="font-semibold text-slate-500">Payment: {cancelled && order.paymentStatus === 'pending' ? 'Not paid' : paymentStatusLabels[order.paymentStatus]}</p>
+      {order.paymentStatus === 'pending' && !cancelled && (
+        <div className="mt-3 rounded-lg bg-amber-50 p-3 text-amber-800 print:hidden">
+          <p>This order isn’t paid yet. It ships once {formatPrice(order.total)} is paid.</p>
+          <button
+            onClick={payNow}
+            disabled={paying}
+            className="mt-3 w-full rounded-lg bg-brand py-2.5 font-semibold text-white transition hover:bg-navy disabled:cursor-wait disabled:opacity-60"
+          >
+            {paying ? 'Waiting for your payment…' : `Pay ${formatPrice(order.total)}`}
+          </button>
+        </div>
+      )}
+      {order.paymentStatus === 'paid' && cancelled && (
+        <p className="mt-2 text-slate-500">Your {formatPrice(order.total)} is refunded to the card or UPI account you paid with, within 5–7 business days.</p>
+      )}
+    </div>
+  );
+}
 
 // Placed, packing (Processing), Shipped with its tracking, then Delivered; or Cancelled. An order handed over in
 // person goes from Processing straight to Delivered.
@@ -54,7 +95,7 @@ function OrderProgress({ order }: { order: Order }) {
 }
 
 // One order in full. Printing the page gives the invoice: the site's header, footer and buttons are left off paper.
-export function OrderDetailsPage({ orders, buyAgain, cancelOrder }: OrderDetailsPageProps) {
+export function OrderDetailsPage({ orders, buyAgain, cancelOrder, payOrder }: OrderDetailsPageProps) {
   const { id } = useParams();
   const order = orders.find((placed: Order) => placed.id === id);
   const { address, phone } = useStoreInfo();
@@ -131,7 +172,7 @@ export function OrderDetailsPage({ orders, buyAgain, cancelOrder }: OrderDetails
                 <dd>{formatPrice(order.total)}</dd>
               </div>
             </dl>
-            <p className="mt-4 text-sm font-semibold text-slate-500">Payment: {paymentLabels[order.paymentMethod]}</p>
+            <OrderPayment order={order} payOrder={payOrder} />
           </section>
           <section className={card}>
             <h2 className="flex items-center gap-2 text-lg font-semibold text-navy">

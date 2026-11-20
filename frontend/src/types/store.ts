@@ -59,6 +59,8 @@ export type Coupon = {
 
 export type DeliveryDetails = { name: string; phone: string; address: string; city: string; pincode: string };
 export type PaymentMethod = 'online' | 'cod';
+// How an order stands with its payment: cash on delivery, or online: pending until Razorpay has the money, then paid.
+export type PaymentStatus = 'cod' | 'pending' | 'paid';
 export type OrderStatus = 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
 
 export type Order = {
@@ -74,12 +76,24 @@ export type Order = {
   total: number; // subtotal - discount + gst + deliveryFee
   delivery: DeliveryDetails;
   paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
   status: OrderStatus;
   tracking: string | null; // courier and tracking number, once it ships
 };
 
 // The admin pages' view of an order: the same, with the name on the account that placed it.
-export type AdminOrder = Order & { customerName: string };
+// paymentId: the Razorpay payment of an order paid online, to find it in the Razorpay Dashboard.
+export type AdminOrder = Order & { customerName: string; paymentId: string | null };
+
+// What Razorpay Checkout needs to collect an order's payment (POST /api/orders and /api/orders/:id/pay).
+export type PaymentDetails = {
+  keyId: string;
+  orderId: string; // the Razorpay order
+  amount: number; // in paise
+  currency: string;
+  description: string;
+  prefill: { name: string; email: string; contact: string };
+};
 
 // GET /api/admin/orders: one page of orders, how many match, and how many are in each status.
 export type AdminOrderList = { orders: AdminOrder[]; total: number; page: number; pageSize: number; counts: Record<OrderStatus, number> };
@@ -112,4 +126,5 @@ export type StoreInfo = {
   nonMedicalCategory: Category; // its products say they aren't medical wherever they're shown
   policies: Policy[];
   policiesUpdated: string;
+  onlinePayment: boolean; // whether checkout can take card and UPI payments (Razorpay is set up)
 };

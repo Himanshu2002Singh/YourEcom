@@ -317,7 +317,8 @@ export function ProductPage({ products, openCart, user, reloadProducts, ...shop 
             <li className="flex gap-3">
               <Banknote size={18} className="shrink-0 text-brand" />
               <span>
-                <strong className="text-slate-900">Cash on delivery</strong>, or pay online by card or UPI.
+                <strong className="text-slate-900">Cash on delivery</strong>
+                {store.onlinePayment ? ', or pay online by card or UPI.' : '.'}
               </span>
             </li>
             {terms ? (

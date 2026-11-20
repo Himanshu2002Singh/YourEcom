@@ -10,6 +10,7 @@ import { useScrollRestoration } from '@/hooks/useScrollRestoration';
 import { StoreInfoContext } from '@/hooks/useStoreInfo';
 import { ApiError, api } from '@/lib/api';
 import { addToLines, setLineQuantity } from '@/lib/cart';
+import { payWithRazorpay } from '@/lib/razorpay';
 import { cartTotals, priceLine } from '@/lib/pricing';
 import { AboutPage } from '@/pages/AboutPage';
 import { AdminDashboard } from '@/pages/admin/AdminDashboard';
@@ -29,7 +30,7 @@ import { ProductPage } from '@/pages/ProductPage';
 import { ProductsPage } from '@/pages/ProductsPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { WishlistPage } from '@/pages/WishlistPage';
-import type { CartItem, CartLine, DeliveryDetails, Order, OrderItem, PaymentMethod, Product, StoreInfo, User } from '@/types/store';
+import type { CartItem, CartLine, DeliveryDetails, Order, OrderItem, PaymentDetails, PaymentMethod, Product, StoreInfo, User } from '@/types/store';
 
 type Notice = { message: string; error?: boolean; action?: { label: string; run: () => void } };
 type SignInDetails = { mode: 'login' | 'signup'; name: string; email: string; password: string };
@@ -186,16 +187,46 @@ function App() {
   };
 
   // Sends the cart as ids, quantities and retail or bulk only: the backend prices the order from its own catalogue.
+  // Collects an order's payment in Razorpay's window, then has the API check it. Answers the order as it is
+  // afterwards: paid, or still pending if the window was closed or something went wrong (which `notify` reports).
+  const collectPayment = async (order: Order, details: PaymentDetails): Promise<Order> => {
+    try {
+      const payment = await payWithRazorpay(details);
+      if (!payment) return order;
+      const { order: paid } = await api<{ order: Order }>(`/orders/${order.id}/payment`, { method: 'POST', body: payment });
+      setOrders((current: Order[] | null) => current && current.map((placed: Order) => (placed.id === paid.id ? paid : placed)));
+      notify(`Payment received for order #${paid.id}`);
+      return paid;
+    } catch (error) {
+      endIfSignedOut(error);
+      notify(error instanceof Error ? error.message : 'Something went wrong with the payment. Try again.', { error: true });
+      return order;
+    }
+  };
+
+  // Pays for an online order that isn't paid yet, such as one whose payment window was closed.
+  const payOrder = async (order: Order): Promise<Order> => {
+    try {
+      const { payment } = await api<{ payment: PaymentDetails }>(`/orders/${order.id}/pay`, { method: 'POST', body: {} });
+      return await collectPayment(order, payment);
+    } catch (error) {
+      endIfSignedOut(error);
+      notify((error as ApiError).message, { error: true });
+      return order;
+    }
+  };
+
+  // An order paid online also opens the payment window straight away (collectPayment).
   const placeOrder = async (delivery: DeliveryDetails, paymentMethod: PaymentMethod, couponCode?: string): Promise<Order> => {
     try {
-      const { order } = await api<{ order: Order }>('/orders', {
+      const { order, payment } = await api<{ order: Order; payment?: PaymentDetails }>('/orders', {
         method: 'POST',
         body: { items: cart.map(({ product, quantity, bulk }: CartItem) => ({ id: product.id, quantity, bulk })), delivery, paymentMethod, couponCode },
       });
       setOrders((current: Order[] | null) => [order, ...(current ?? [])]);
       setCartLines([]);
       loadProducts(); // the order took items out of stock
-      return order;
+      return payment ? await collectPayment(order, payment) : order;
     } catch (error) {
       endIfSignedOut(error);
       if (error instanceof ApiError && error.status === 409) loadProducts(); // stock ran out: show what's left
@@ -370,6 +401,7 @@ function App() {
                     savedDelivery={orders?.[0]?.delivery}
                     setQuantity={setQuantity}
                     placeOrder={placeOrder}
+                    payOrder={payOrder}
                   />
                 )),
               )}
@@ -399,7 +431,7 @@ function App() {
               )}
             />
             <Route path="/orders" element={requireUser(() => <OrdersPage orders={orders ?? []} buyAgain={buyAgain} cancelOrder={cancelOrder} />)} />
-            <Route path="/orders/:id" element={requireUser(() => <OrderDetailsPage orders={orders ?? []} buyAgain={buyAgain} cancelOrder={cancelOrder} />)} />
+            <Route path="/orders/:id" element={requireUser(() => <OrderDetailsPage orders={orders ?? []} buyAgain={buyAgain} cancelOrder={cancelOrder} payOrder={payOrder} />)} />
             <Route path="/policies/:slug" element={<PolicyPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>

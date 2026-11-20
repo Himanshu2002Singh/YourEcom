@@ -1,11 +1,12 @@
 import { Fragment, useState, type ChangeEvent, type FocusEvent, type FormEvent } from 'react';
 import { Link } from 'react-router';
-import { ArrowLeft, ArrowRight, Check, MapPin, PackageCheck, ShoppingCart, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Clock, CreditCard, LockKeyhole, MapPin, PackageCheck, ShoppingCart, type LucideIcon } from 'lucide-react';
 import { CouponBox } from '@/components/CouponBox';
 import { QuantityStepper } from '@/components/QuantityStepper';
 import { BulkTag } from '@/components/StoreShared';
 import { TextField } from '@/components/TextField';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { useStoreInfo } from '@/hooks/useStoreInfo';
 import { FREE_DELIVERY_THRESHOLD, discountFor, formatPrice, type CartTotals } from '@/lib/pricing';
 import type { CartItem, Coupon, DeliveryDetails, Order, PaymentMethod, User } from '@/types/store';
 
@@ -16,6 +17,7 @@ type CheckoutPageProps = {
   savedDelivery?: DeliveryDetails;
   setQuantity: (id: number, quantity: number) => void;
   placeOrder: (delivery: DeliveryDetails, paymentMethod: PaymentMethod, couponCode?: string) => Promise<Order>;
+  payOrder: (order: Order) => Promise<Order>;
 };
 
 // The cart's totals with the coupon's discount taken off.
@@ -63,30 +65,34 @@ const deliveryFields: {
   },
 ];
 
-// Cash on delivery only, until a payment gateway takes card and UPI payments: the API also accepts 'online',
-// but nothing would collect the money yet.
-const paymentOptions: { value: PaymentMethod; title: string; description: string; icon: LucideIcon }[] = [
-  { value: 'cod', title: 'Cash on delivery', description: 'Pay in cash when your order arrives', icon: PackageCheck },
-];
+type PaymentOption = { value: PaymentMethod; title: string; description: string; icon: LucideIcon };
+const cashOnDelivery: PaymentOption = { value: 'cod', title: 'Cash on delivery', description: 'Pay in cash when your order arrives', icon: PackageCheck };
+// Offered only once the store has its Razorpay keys (StoreInfo.onlinePayment).
+const payOnline: PaymentOption = { value: 'online', title: 'Card / UPI / Netbanking', description: 'Pay now through Razorpay', icon: CreditCard };
 
 const steps = ['Delivery', 'Payment', 'Done'];
 
 const errorFor = (field: Field, value: string): string | undefined => deliveryFields.find((item) => item.field === field)?.validate(value.trim());
 
-export function CheckoutPage({ cart, totals: cartTotals, user, savedDelivery, setQuantity, placeOrder }: CheckoutPageProps) {
+export function CheckoutPage({ cart: liveCart, totals: liveTotals, user, savedDelivery, setQuantity, placeOrder, payOrder }: CheckoutPageProps) {
+  const { onlinePayment } = useStoreInfo();
+  const paymentOptions = onlinePayment ? [payOnline, cashOnDelivery] : [cashOnDelivery];
   const [step, setStep] = useState(1);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(onlinePayment ? 'online' : 'cod');
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
   const [form, setForm] = useState<DeliveryDetails>(savedDelivery ?? { name: user.name, phone: '', address: '', city: '', pincode: '' });
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
   const [placing, setPlacing] = useState(false);
   const [orderError, setOrderError] = useState('');
   const [coupon, setCoupon] = useState<Coupon | null>(null);
-  usePageTitle(placedOrder ? 'Order confirmed' : 'Checkout');
+  // The cart empties as soon as the order is saved, so while it is placed and paid for (with Razorpay's window
+  // open over the page) the page keeps showing the cart that was sent.
+  const [sent, setSent] = useState<{ cart: CartItem[]; totals: CartTotals } | null>(null);
+  const { cart, totals: cartTotals } = placing && sent ? sent : { cart: liveCart, totals: liveTotals };
+  usePageTitle(placedOrder ? (placedOrder.paymentStatus === 'pending' ? 'Payment pending' : 'Order confirmed') : 'Checkout');
 
-  if (placedOrder) return <OrderConfirmation order={placedOrder} />;
-  // While an order is being placed the cart empties just before the confirmation arrives.
-  if (cart.length === 0 && !placing) return <EmptyCheckout />;
+  if (placedOrder) return <OrderConfirmation order={placedOrder} pay={async () => setPlacedOrder(await payOrder(placedOrder))} />;
+  if (cart.length === 0) return <EmptyCheckout />;
 
   // A coupon is for the retail items only. One whose minimum order they no longer reach takes nothing off and isn't sent.
   const discount = coupon ? discountFor(coupon, cartTotals.retailSubtotal) : 0;
@@ -126,9 +132,11 @@ export function CheckoutPage({ cart, totals: cartTotals, user, savedDelivery, se
   // The backend prices the order and answers with it, or with a message to show if it refuses.
   const submitOrder = async (): Promise<void> => {
     setPlacing(true);
+    setSent({ cart: liveCart, totals: liveTotals });
     setOrderError('');
     try {
       setPlacedOrder(await placeOrder(form, paymentMethod, discount > 0 ? coupon?.code : undefined));
+      window.scrollTo({ top: 0 }); // the confirmation takes the form's place: show it from the top
     } catch (error) {
       setOrderError(error instanceof Error ? error.message : 'Something went wrong. Try again.');
     } finally {
@@ -213,8 +221,19 @@ export function CheckoutPage({ cart, totals: cartTotals, user, savedDelivery, se
                 disabled={placing}
                 className="mt-7 w-full rounded-lg bg-brand py-4 font-semibold text-white transition hover:bg-navy disabled:cursor-wait disabled:opacity-60"
               >
-                {placing ? 'Placing your order…' : `Place order · ${formatPrice(totals.total)}`}
+                {placing
+                  ? paymentMethod === 'online'
+                    ? 'Waiting for your payment…'
+                    : 'Placing your order…'
+                  : paymentMethod === 'online'
+                    ? `Pay ${formatPrice(totals.total)}`
+                    : `Place order · ${formatPrice(totals.total)}`}
               </button>
+              {paymentMethod === 'online' && (
+                <p className="mt-4 flex items-center justify-center gap-2 text-xs font-semibold text-slate-400">
+                  <LockKeyhole size={14} /> Payments are processed securely by Razorpay
+                </p>
+              )}
               {orderError && (
                 <p role="alert" className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
                   {orderError}
@@ -332,7 +351,50 @@ function OrderSummary({ cart, totals: { subtotal, retailSubtotal, gst, discount,
   );
 }
 
-function OrderConfirmation({ order }: { order: Order }) {
+// After placing an order: confirmed, or, for an order paid online whose payment window was closed, saved and
+// waiting for its payment, with a button to pay now.
+function OrderConfirmation({ order, pay }: { order: Order; pay: () => Promise<void> }) {
+  const [paying, setPaying] = useState(false);
+  const pending = order.paymentStatus === 'pending';
+  const payNow = async (): Promise<void> => {
+    setPaying(true);
+    try {
+      await pay();
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  if (pending) {
+    return (
+      <main className="mx-auto max-w-2xl px-5 py-10">
+        <CheckoutSteps step={steps.length - 1} />
+        <div className="rounded-xl bg-white p-8 text-center shadow-xl sm:p-14">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+            <Clock size={40} />
+          </div>
+          <p className="mt-6 text-sm font-semibold uppercase tracking-wider text-amber-700">Payment pending</p>
+          <h1 className="mt-3 text-4xl font-semibold text-navy">Your order is saved, but not paid yet.</h1>
+          <p className="mx-auto mt-4 max-w-md leading-7 text-slate-500">
+            Pay {formatPrice(order.total)} for order #{order.id} to confirm it. Until then it waits under My orders, where you can pay or cancel it.
+          </p>
+          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+            <button
+              onClick={payNow}
+              disabled={paying}
+              className="rounded-lg bg-brand px-7 py-4 font-semibold text-white transition hover:bg-navy disabled:cursor-wait disabled:opacity-60"
+            >
+              {paying ? 'Waiting for your payment…' : `Pay ${formatPrice(order.total)}`}
+            </button>
+            <Link to={`/orders/${order.id}`} className="rounded-lg border-2 border-slate-200 px-7 py-4 font-semibold text-navy transition hover:border-brand hover:text-brand">
+              View order details
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto max-w-2xl px-5 py-10">
       <CheckoutSteps step={steps.length} />
@@ -343,8 +405,8 @@ function OrderConfirmation({ order }: { order: Order }) {
         <p className="mt-6 text-sm font-semibold uppercase tracking-wider text-leaf">Order confirmed</p>
         <h1 className="mt-3 text-4xl font-semibold text-navy">Your care package is on its way.</h1>
         <p className="mx-auto mt-4 max-w-md leading-7 text-slate-500">
-          Order #{order.id} for {formatPrice(order.total)} has been received{order.paymentMethod === 'cod' ? ' — please keep the cash ready at delivery' : ''}. We will send dispatch
-          updates to {order.delivery.phone}.
+          Order #{order.id} for {formatPrice(order.total)} has been received
+          {order.paymentStatus === 'paid' ? ' and paid' : ' — please keep the cash ready at delivery'}. We will send dispatch updates to {order.delivery.phone}.
         </p>
         {order.discount > 0 && (
           <p className="mx-auto mt-4 w-fit rounded-full bg-emerald-50 px-4 py-2 text-sm font-semibold text-leaf">

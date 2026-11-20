@@ -6,7 +6,7 @@ import { StatusPill } from '@/components/OrderParts';
 import { BulkTag, LoadError, Loading } from '@/components/StoreShared';
 import { useApiData } from '@/hooks/useApiData';
 import { usePageTitle } from '@/hooks/usePageTitle';
-import { formatDateTime, paymentLabels } from '@/lib/format';
+import { formatDateTime, paymentStatusLabels } from '@/lib/format';
 import { formatPrice } from '@/lib/pricing';
 import type { AdminOrder, AdminOrderList, OrderStatus } from '@/types/store';
 
@@ -51,7 +51,9 @@ function OrderRow({ order }: { order: AdminOrder }) {
           </span>
           <span className="text-right">
             <span className="block font-bold text-navy">{formatPrice(order.total)}</span>
-            <span className="block text-xs text-slate-500">{paymentLabels[order.paymentMethod]}</span>
+            <span className={`block text-xs ${order.paymentStatus === 'pending' && order.status !== 'Cancelled' ? 'font-bold text-amber-700' : 'text-slate-500'}`}>
+              {paymentStatusLabels[order.paymentStatus]}
+            </span>
           </span>
         </span>
         <span className="hidden text-right md:block">
