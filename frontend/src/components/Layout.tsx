@@ -2,8 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 
 import { Link, useLocation, useNavigate } from 'react-router';
 import { BadgeCheck, ChevronRight, ExternalLink, Heart, Mail, MapPin, Menu, Package, Phone, Search, ShoppingCart, UserRound, X } from 'lucide-react';
 import { WhatsAppIcon } from '@/components/StoreShared';
-import { SUPPLY_TYPES } from '@/data/company';
-import { ADDRESS, EMAIL, GSTIN, INDIAMART_LINK, MAP_LINK, PHONE, PHONE_LINK, whatsAppLink } from '@/data/contact';
+import { mapLink, useStoreInfo, whatsAppLink } from '@/hooks/useStoreInfo';
 import { categoryPath, groupByFamily, groupName, matchesSearch, storeCategories, type ProductGroup } from '@/lib/catalogue';
 import type { Category, Product, User } from '@/types/store';
 
@@ -47,6 +46,7 @@ const headerItem = 'flex items-center rounded border border-transparent px-1.5 p
 function SearchBox({ products, className }: { products: Product[] | null; className: string }) {
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
+  const store = useStoreInfo();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('');
   const [open, setOpen] = useState(false);
@@ -90,7 +90,7 @@ function SearchBox({ products, className }: { products: Product[] | null; classN
         className="hidden max-w-36 shrink-0 cursor-pointer rounded-l-md border-r border-slate-300 bg-slate-100 px-2 text-xs text-slate-600 outline-none hover:bg-slate-200 lg:block"
       >
         <option value="">All categories</option>
-        {storeCategories(products).map((name) => (
+        {storeCategories(products, store).map((name) => (
           <option key={name} value={name}>
             {name}
           </option>
@@ -137,11 +137,12 @@ function SearchBox({ products, className }: { products: Product[] | null; classN
 export function Header({ cartCount, wishlistCount, openCart, user, products }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { pathname, search } = useLocation();
+  const store = useStoreInfo();
   const activeCategory = pathname === '/products' ? new URLSearchParams(search).get('category') : null;
   const accountPath = user ? '/profile' : '/login';
   const greeting = user ? `Hello, ${user.name.split(' ')[0]}` : 'Hello, sign in';
   const closeMenu = (): void => setMenuOpen(false);
-  const shopCategories = storeCategories(products);
+  const shopCategories = storeCategories(products, store);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -179,16 +180,16 @@ export function Header({ cartCount, wishlistCount, openCart, user, products }: H
           wholesale and government buyers check a supplier. It scrolls away; the header below stays. */}
       <div className="bg-navy-dark text-xs text-blue-100 print:hidden">
         <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-3 px-3 py-1.5 sm:px-4">
-          <a href={PHONE_LINK} className="flex items-center gap-1.5 whitespace-nowrap font-medium transition hover:text-white">
+          <a href={store.phoneLink} className="flex items-center gap-1.5 whitespace-nowrap font-medium transition hover:text-white">
             <Phone size={13} className="shrink-0" />
             <span>
               <span className="hidden sm:inline">Call / WhatsApp </span>
-              {PHONE}
+              {store.phone}
             </span>
           </a>
-          <p className="hidden truncate md:block">{SUPPLY_TYPES.join(' · ')}</p>
+          <p className="hidden truncate md:block">{store.supplyTypes.join(' · ')}</p>
           <a
-            href={INDIAMART_LINK}
+            href={store.indiamartLink}
             target="_blank"
             rel="noreferrer"
             className="flex items-center gap-1.5 whitespace-nowrap rounded-full bg-white px-2.5 py-0.5 font-bold text-navy transition hover:bg-brand-soft"
@@ -282,10 +283,10 @@ export function Header({ cartCount, wishlistCount, openCart, user, products }: H
               </div>
             ))}
             <div className="grid gap-1 py-3 text-sm">
-              <a href={PHONE_LINK} className="flex items-center gap-3 px-4 py-2.5 text-slate-700 hover:bg-slate-100">
-                <Phone size={17} className="text-brand" /> Call {PHONE}
+              <a href={store.phoneLink} className="flex items-center gap-3 px-4 py-2.5 text-slate-700 hover:bg-slate-100">
+                <Phone size={17} className="text-brand" /> Call {store.phone}
               </a>
-              <a href={whatsAppLink(BULK_MESSAGE)} target="_blank" rel="noreferrer" className="flex items-center gap-3 px-4 py-2.5 text-slate-700 hover:bg-slate-100">
+              <a href={whatsAppLink(store, BULK_MESSAGE)} target="_blank" rel="noreferrer" className="flex items-center gap-3 px-4 py-2.5 text-slate-700 hover:bg-slate-100">
                 <WhatsAppIcon size={17} className="text-whatsapp" /> Bulk order on WhatsApp
               </a>
               <Link to="/orders" onClick={closeMenu} className="flex items-center gap-3 px-4 py-2.5 text-slate-700 hover:bg-slate-100">
@@ -301,9 +302,10 @@ export function Header({ cartCount, wishlistCount, openCart, user, products }: H
 
 // The chat button in the corner of every page.
 export function WhatsAppButton() {
+  const store = useStoreInfo();
   return (
     <a
-      href={whatsAppLink()}
+      href={whatsAppLink(store)}
       target="_blank"
       rel="noreferrer"
       aria-label="Chat with YourEcom on WhatsApp"
@@ -338,6 +340,7 @@ const footerLinks = (shop: Category[]): [string, [string, string][]][] => [
 ];
 
 export function Footer({ products }: { products: Product[] | null }) {
+  const store = useStoreInfo();
   return (
     <footer className="mt-8 text-sm print:hidden">
       <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="block w-full bg-brand py-3.5 text-center font-medium text-white transition hover:bg-brand-dark">
@@ -353,33 +356,35 @@ export function Footer({ products }: { products: Product[] | null }) {
               Medical disposable wholesaler in New Delhi: syringes, IV cannula and sets, gloves, masks and more, for wholesale, retail, government and local supply.
             </p>
             <address className="mt-5 space-y-3 not-italic">
-              <a href={MAP_LINK} target="_blank" rel="noreferrer" className="flex gap-3 transition hover:text-white">
+              <a href={mapLink(store)} target="_blank" rel="noreferrer" className="flex gap-3 transition hover:text-white">
                 <MapPin size={17} className="mt-0.5 shrink-0" />
                 <span>
-                  {ADDRESS[0]}
-                  <br />
-                  {ADDRESS[1]}
+                  {store.address.map((line: string) => (
+                    <span key={line} className="block">
+                      {line}
+                    </span>
+                  ))}
                 </span>
               </a>
-              <a href={PHONE_LINK} className="flex items-center gap-3 transition hover:text-white">
-                <Phone size={17} className="shrink-0" /> {PHONE}
+              <a href={store.phoneLink} className="flex items-center gap-3 transition hover:text-white">
+                <Phone size={17} className="shrink-0" /> {store.phone}
               </a>
-              <a href={`mailto:${EMAIL}`} className="flex items-center gap-3 transition hover:text-white">
-                <Mail size={17} className="shrink-0" /> {EMAIL}
+              <a href={`mailto:${store.email}`} className="flex items-center gap-3 transition hover:text-white">
+                <Mail size={17} className="shrink-0" /> {store.email}
               </a>
-              <a href={whatsAppLink()} target="_blank" rel="noreferrer" className="flex items-center gap-3 transition hover:text-white">
+              <a href={whatsAppLink(store)} target="_blank" rel="noreferrer" className="flex items-center gap-3 transition hover:text-white">
                 <WhatsAppIcon size={17} /> Chat on WhatsApp
               </a>
             </address>
             <p className="mt-5 text-xs">
-              GSTIN <span className="font-bold text-white">{GSTIN}</span>
+              GSTIN <span className="font-bold text-white">{store.gstin}</span>
               <span aria-hidden="true"> · </span>
-              <a href={INDIAMART_LINK} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 transition hover:text-white hover:underline">
+              <a href={store.indiamartLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 transition hover:text-white hover:underline">
                 IndiaMART profile <ExternalLink size={12} />
               </a>
             </p>
           </div>
-          {footerLinks(storeCategories(products)).map(([title, links]) => (
+          {footerLinks(storeCategories(products, store)).map(([title, links]) => (
             <nav key={title} aria-label={title}>
               <p className="font-bold text-white">{title}</p>
               <ul className="mt-4 space-y-2.5">

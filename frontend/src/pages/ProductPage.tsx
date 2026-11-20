@@ -4,10 +4,8 @@ import { Banknote, ChevronRight, MapPin, PackageCheck, ShoppingCart, TriangleAle
 import { ProductReviews } from '@/components/ProductReviews';
 import { QuantityStepper } from '@/components/QuantityStepper';
 import { Price, ProductCard, RatingSummary, SaveButton, StockNote, WhatsAppIcon, panel, type ShopActions } from '@/components/StoreShared';
-import { NON_MEDICAL_CATEGORY } from '@/data/categories';
-import { ADDRESS, PHONE, PHONE_LINK, whatsAppLink } from '@/data/contact';
 import { usePageTitle } from '@/hooks/usePageTitle';
-import { NO_API } from '@/lib/api';
+import { useStoreInfo, whatsAppLink } from '@/hooks/useStoreInfo';
 import { categoryPath, discountOf, groupByFamily, groupName, variantLabel, type ProductGroup } from '@/lib/catalogue';
 import { DELIVERY_FEE, FREE_DELIVERY_THRESHOLD, formatPrice, lineTotal, perItemPrice, priceLine } from '@/lib/pricing';
 import { NotFoundPage } from '@/pages/NotFoundPage';
@@ -82,6 +80,7 @@ export function ProductPage({ products, openCart, user, reloadProducts, ...shop 
   const [wantsBulk, setWantsBulk] = useState(() => Boolean(product && lineOf(product.id)?.bulk));
   // How many packs of a bulk order are being chosen, before it goes in the cart; for one product only.
   const [bulkDraft, setBulkDraft] = useState<{ id: number; quantity: number } | null>(null);
+  const store = useStoreInfo();
   usePageTitle(product?.name ?? 'Page not found');
 
   if (!product) return <NotFoundPage />;
@@ -251,7 +250,7 @@ export function ProductPage({ products, openCart, user, reloadProducts, ...shop 
               </p>
               {bulkTooBig ? (
                 <p className="mt-2 text-sm font-bold text-amber-700">
-                  {soldOut ? 'Out of stock' : `Only ${product.stock} in stock`}, fewer than a bulk order. Call us on {PHONE} for a bulk supply.
+                  {soldOut ? 'Out of stock' : `Only ${product.stock} in stock`}, fewer than a bulk order. Call us on {store.phone} for a bulk supply.
                 </p>
               ) : (
                 <StockNote stock={product.stock} className="mt-2 text-sm" />
@@ -269,7 +268,7 @@ export function ProductPage({ products, openCart, user, reloadProducts, ...shop 
             </div>
           )}
 
-          {product.category === NON_MEDICAL_CATEGORY && (
+          {product.category === store.nonMedicalCategory && (
             <p className="mt-4 flex gap-2.5 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
               <TriangleAlert size={18} className="mt-0.5 shrink-0" />
               <span>
@@ -337,7 +336,7 @@ export function ProductPage({ products, openCart, user, reloadProducts, ...shop 
                 <WhatsAppIcon size={18} className="text-whatsapp" />
                 <span>
                   <strong className="text-slate-900">Buying in bulk?</strong>{' '}
-                  <a href={whatsAppLink(bulkMessage)} target="_blank" rel="noreferrer" className="font-medium text-brand hover:underline">
+                  <a href={whatsAppLink(store, bulkMessage)} target="_blank" rel="noreferrer" className="font-medium text-brand hover:underline">
                     Ask for a bulk rate on WhatsApp
                   </a>
                 </span>
@@ -374,21 +373,19 @@ export function ProductPage({ products, openCart, user, reloadProducts, ...shop 
               <p className="text-slate-600">
                 Sold and shipped by <strong className="text-slate-900">YourEcom</strong>, medical disposable wholesaler
                 <br />
-                {ADDRESS[0]}, {ADDRESS[1]}
+                {store.address.join(', ')}
               </p>
             </div>
-            <a href={PHONE_LINK} className="font-bold text-brand hover:underline">
-              Call {PHONE}
+            <a href={store.phoneLink} className="font-bold text-brand hover:underline">
+              Call {store.phone}
             </a>
           </section>
         </div>
       </div>
 
-      {!NO_API && (
-        <div className={`${panel} mt-3 px-3 pb-6 sm:px-5 [&>section]:mt-0 [&>section]:pt-6`}>
-          <ProductReviews product={product} user={user} onSaved={reloadProducts} />
-        </div>
-      )}
+      <div className={`${panel} mt-3 px-3 pb-6 sm:px-5 [&>section]:mt-0 [&>section]:pt-6`}>
+        <ProductReviews product={product} user={user} onSaved={reloadProducts} />
+      </div>
 
       {related.length > 0 && (
         <section className={`${panel} mt-3`}>

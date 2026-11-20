@@ -2,22 +2,20 @@ import { Link } from 'react-router';
 import { BadgeCheck, ChevronRight, Headset, Mail, MapPin, Phone, ShieldCheck, Truck, type LucideIcon } from 'lucide-react';
 import { LoadError, Loading, ProductCard, WhatsAppIcon, panel, type ShopActions } from '@/components/StoreShared';
 import { SuppliedToStrip } from '@/components/SuppliedToStrip';
-import { NON_MEDICAL_CATEGORY } from '@/data/categories';
-import { ABOUT_TEXT } from '@/data/company';
-import { ADDRESS, EMAIL, MAP_LINK, PHONE, PHONE_LINK, whatsAppLink } from '@/data/contact';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { mapLink, useStoreInfo, whatsAppLink } from '@/hooks/useStoreInfo';
 import { byCategory, categoryImage, categoryPath, discountOf, groupByFamily, groupName, storeCategories, variantSummary, type ProductGroup } from '@/lib/catalogue';
 import { formatPrice } from '@/lib/pricing';
 import type { Category, Product } from '@/types/store';
 
 const QUOTE_MESSAGE = 'Hello YourEcom, please send a quotation for our hospital / clinic. Products and quantities: ';
 
-// After the syringes, every other category gets a panel, four to a row as on a marketplace home page. Categories
-// an admin added get a row of their own after these.
-const PANEL_ROWS: Category[][] = [
+// After the syringes, every other category gets a panel, four to a row as on a marketplace home page, ending with
+// the non-medical one. Categories an admin added get a row of their own after these.
+const panelRows = (nonMedicalCategory: Category): Category[][] => [
   ['IV Cannula', 'IV Sets', 'IV Fluids', 'Gloves'],
   ['Face Masks', 'Caps & Shoe Covers', 'Bandages & Gauze', 'Surgical Tapes'],
-  ['Lab Disposables', NON_MEDICAL_CATEGORY],
+  ['Lab Disposables', nonMedicalCategory],
 ];
 
 // What the client promises, from their posters.
@@ -41,6 +39,7 @@ type HomePageProps = ShopActions & {
 
 // A category's best on one panel: up to three products as tiles (or one large tile), then "See all".
 function CategoryPanel({ category, groups }: { category: Category; groups: ProductGroup[] }) {
+  const store = useStoreInfo();
   const tile = (group: ProductGroup, large: boolean) => {
     const first = group[0];
     const off = bestDiscount(group);
@@ -62,7 +61,7 @@ function CategoryPanel({ category, groups }: { category: Category; groups: Produ
   return (
     <section className={`${panel} flex flex-col p-4`}>
       <h2 className="text-lg font-bold text-slate-900">{category}</h2>
-      {category === NON_MEDICAL_CATEGORY && <p className="text-xs font-bold text-amber-700">Toys, play sets and party syringes. Not for medical use.</p>}
+      {category === store.nonMedicalCategory && <p className="text-xs font-bold text-amber-700">Toys, play sets and party syringes. Not for medical use.</p>}
       {groups.length === 1 ? (
         <div className="mt-3 flex-1">{tile(groups[0], true)}</div>
       ) : (
@@ -89,12 +88,14 @@ function CategoryPanel({ category, groups }: { category: Category; groups: Produ
 
 export function HomePage({ products, catalogueError, reloadProducts, ...shop }: HomePageProps) {
   usePageTitle();
-  const groups = groupByFamily([...(products ?? [])].sort(byCategory));
+  const store = useStoreInfo();
+  const rows = panelRows(store.nonMedicalCategory);
+  const groups = groupByFamily([...(products ?? [])].sort(byCategory(store)));
   const groupsIn = (category: Category): ProductGroup[] => groups.filter((group: ProductGroup) => group[0].category === category);
-  const shopCategories = storeCategories(products);
+  const shopCategories = storeCategories(products, store);
   // A panel only for a category that has products, and one for each category an admin added.
   const panels = (row: Category[]): Category[] => row.filter((category: Category) => shopCategories.includes(category));
-  const placed = new Set<Category>(['Syringes', ...PANEL_ROWS.flat()]);
+  const placed = new Set<Category>(['Syringes', ...rows.flat()]);
   const added = shopCategories.filter((category: Category) => !placed.has(category));
 
   return (
@@ -106,7 +107,7 @@ export function HomePage({ products, catalogueError, reloadProducts, ...shop }: 
           {shopCategories.map((category) => (
             <li key={category} className="shrink-0">
               <Link to={categoryPath(category)} className="group flex w-[5.25rem] flex-col items-center gap-2 rounded-md p-1 text-center sm:w-28 lg:w-full">
-                <img src={categoryImage(category, products)} alt="" className="h-16 w-16 rounded-full border border-slate-200 object-cover transition group-hover:scale-105 sm:h-20 sm:w-20" />
+                <img src={categoryImage(category, products, store)} alt="" className="h-16 w-16 rounded-full border border-slate-200 object-cover transition group-hover:scale-105 sm:h-20 sm:w-20" />
                 <span className="text-xs font-medium leading-tight text-slate-800 group-hover:text-brand sm:text-sm">{category}</span>
               </Link>
             </li>
@@ -139,7 +140,7 @@ export function HomePage({ products, catalogueError, reloadProducts, ...shop }: 
           </section>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {panels(PANEL_ROWS[0]).map((category: Category) => (
+            {panels(rows[0]).map((category: Category) => (
               <CategoryPanel key={category} category={category} groups={groupsIn(category)} />
             ))}
           </div>
@@ -152,28 +153,28 @@ export function HomePage({ products, catalogueError, reloadProducts, ...shop }: 
               <p className="mt-2 text-blue-100">Send us your list for a quotation, or call us. Local supply to hospitals, clinics and health centres too.</p>
               <div className="mt-5 flex flex-wrap gap-3">
                 <a
-                  href={whatsAppLink(QUOTE_MESSAGE)}
+                  href={whatsAppLink(store, QUOTE_MESSAGE)}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-2 rounded-full bg-cart px-5 py-2.5 text-sm font-bold text-slate-900 transition hover:bg-cart-dark"
                 >
                   <WhatsAppIcon size={17} /> WhatsApp for a quote
                 </a>
-                <a href={PHONE_LINK} className="inline-flex items-center gap-2 rounded-full border border-white/40 px-5 py-2.5 text-sm font-bold transition hover:bg-white/10">
-                  <Phone size={16} /> {PHONE}
+                <a href={store.phoneLink} className="inline-flex items-center gap-2 rounded-full border border-white/40 px-5 py-2.5 text-sm font-bold transition hover:bg-white/10">
+                  <Phone size={16} /> {store.phone}
                 </a>
               </div>
             </div>
           </section>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {panels(PANEL_ROWS[1]).map((category: Category) => (
+            {panels(rows[1]).map((category: Category) => (
               <CategoryPanel key={category} category={category} groups={groupsIn(category)} />
             ))}
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {panels(PANEL_ROWS[2]).map((category: Category) => (
+            {panels(rows[2]).map((category: Category) => (
               <CategoryPanel key={category} category={category} groups={groupsIn(category)} />
             ))}
             <section className={`${panel} flex flex-col p-4`}>
@@ -187,7 +188,7 @@ export function HomePage({ products, catalogueError, reloadProducts, ...shop }: 
             <section className={`${panel} flex flex-col p-4`}>
               <h2 className="text-lg font-bold text-slate-900">About YourEcom</h2>
               <img src="/photos/stock-packing-room.jpg" alt="Cartons and bags of syringes in our stock" loading="lazy" className="mt-3 aspect-[4/3] w-full rounded object-cover" />
-              <p className="mt-2 line-clamp-3 text-sm text-slate-600">{ABOUT_TEXT}</p>
+              <p className="mt-2 line-clamp-3 text-sm text-slate-600">{store.aboutText}</p>
               <Link to="/about" className="mt-auto pt-3 text-sm font-medium text-brand hover:underline">
                 Read about us
               </Link>
@@ -241,30 +242,30 @@ export function HomePage({ products, catalogueError, reloadProducts, ...shop }: 
         </ul>
         <div className="grid gap-5 p-5 md:grid-cols-[1fr_auto] md:items-center">
           <address className="grid gap-2 text-sm not-italic text-slate-700 sm:grid-cols-3 sm:gap-5">
-            <a href={MAP_LINK} target="_blank" rel="noreferrer" className="flex gap-2.5 hover:text-brand">
+            <a href={mapLink(store)} target="_blank" rel="noreferrer" className="flex gap-2.5 hover:text-brand">
               <MapPin size={18} className="mt-0.5 shrink-0 text-brand" />
               <span>
                 <strong className="block text-slate-900">YourEcom, Medical Disposable Wholesaler</strong>
-                {ADDRESS[0]}, {ADDRESS[1]}
+                {store.address.join(', ')}
               </span>
             </a>
-            <a href={PHONE_LINK} className="flex gap-2.5 hover:text-brand">
+            <a href={store.phoneLink} className="flex gap-2.5 hover:text-brand">
               <Phone size={18} className="mt-0.5 shrink-0 text-brand" />
               <span>
                 <strong className="block text-slate-900">Call / WhatsApp</strong>
-                {PHONE}
+                {store.phone}
               </span>
             </a>
-            <a href={`mailto:${EMAIL}`} className="flex gap-2.5 hover:text-brand">
+            <a href={`mailto:${store.email}`} className="flex gap-2.5 hover:text-brand">
               <Mail size={18} className="mt-0.5 shrink-0 text-brand" />
               <span>
                 <strong className="block text-slate-900">Email</strong>
-                {EMAIL}
+                {store.email}
               </span>
             </a>
           </address>
           <a
-            href={whatsAppLink(QUOTE_MESSAGE)}
+            href={whatsAppLink(store, QUOTE_MESSAGE)}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center justify-center gap-2 rounded-full bg-whatsapp px-5 py-3 text-sm font-bold text-white transition hover:brightness-95"

@@ -7,7 +7,8 @@ import { Footer, Header, WhatsAppButton } from '@/components/Layout';
 import { LoadError, Loading } from '@/components/StoreShared';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useScrollRestoration } from '@/hooks/useScrollRestoration';
-import { ApiError, NO_API, api } from '@/lib/api';
+import { StoreInfoContext } from '@/hooks/useStoreInfo';
+import { ApiError, api } from '@/lib/api';
 import { addToLines, setLineQuantity } from '@/lib/cart';
 import { cartTotals, priceLine } from '@/lib/pricing';
 import { AboutPage } from '@/pages/AboutPage';
@@ -28,7 +29,7 @@ import { ProductPage } from '@/pages/ProductPage';
 import { ProductsPage } from '@/pages/ProductsPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { WishlistPage } from '@/pages/WishlistPage';
-import type { CartItem, CartLine, DeliveryDetails, Order, OrderItem, PaymentMethod, Product, User } from '@/types/store';
+import type { CartItem, CartLine, DeliveryDetails, Order, OrderItem, PaymentMethod, Product, StoreInfo, User } from '@/types/store';
 
 type Notice = { message: string; error?: boolean; action?: { label: string; run: () => void } };
 type SignInDetails = { mode: 'login' | 'signup'; name: string; email: string; password: string };
@@ -36,12 +37,14 @@ type SignInDetails = { mode: 'login' | 'signup'; name: string; email: string; pa
 // A page that is waiting for the API, or couldn't get what it needed from it.
 const PageStatus = ({ children }: { children: ReactNode }) => <main className="mx-auto min-h-[60vh] max-w-7xl px-5 py-10 lg:px-8">{children}</main>;
 
-// Only the cart lives in this browser. The catalogue, the account (a session cookie),
+// Only the cart lives in this browser. The store's details, the catalogue, the account (a session cookie),
 // preferences and orders all come from the backend's database through /api.
 function App() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const [cartLines, setCartLines] = usePersistentState<CartLine[]>('yourecom.cart', []);
+  const [storeInfo, setStoreInfo] = useState<StoreInfo | null>(null); // null until the store's details load
+  const [storeInfoError, setStoreInfoError] = useState('');
   const [products, setProducts] = useState<Product[] | null>(null); // null until the catalogue loads
   const [catalogueError, setCatalogueError] = useState('');
   const [user, setUser] = useState<User | null | undefined>(undefined); // undefined until the session is checked
@@ -58,12 +61,17 @@ function App() {
     noticeTimer.current = window.setTimeout(() => setNotice(null), action || error ? 4000 : 2500);
   }, []);
 
+  const loadStoreInfo = useCallback((): void => {
+    setStoreInfoError('');
+    api<{ store: StoreInfo }>('/store')
+      .then(({ store }) => setStoreInfo(store))
+      .catch((error: ApiError) => setStoreInfoError(error.message));
+  }, []);
+
+  useEffect(loadStoreInfo, [loadStoreInfo]);
+
   const loadProducts = useCallback((): void => {
     setCatalogueError('');
-    if (NO_API) {
-      import('@/data/previewCatalogue').then(({ previewCatalogue }) => setProducts(previewCatalogue));
-      return;
-    }
     api<{ products: Product[] }>('/products')
       .then(({ products: catalogue }) => setProducts(catalogue))
       .catch((error: ApiError) => setCatalogueError(error.message));
@@ -301,119 +309,130 @@ function App() {
     return <PageStatus>{catalogueError ? <LoadError message={catalogueError} retry={loadProducts} /> : <Loading />}</PageStatus>;
   };
 
+  // Every page shows the store's details (contacts, categories, policies), so none renders until they have loaded.
+  if (!storeInfo) {
+    return (
+      <div className="min-h-screen bg-canvas text-slate-800">
+        <PageStatus>{storeInfoError ? <LoadError message={storeInfoError} retry={loadStoreInfo} /> : <Loading />}</PageStatus>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-canvas text-slate-800">
-      <Routes>
-        <Route path="/admin" element={requireAdmin((currentUser: User) => <AdminLayout user={currentUser} signOut={signOut} />)}>
-          <Route index element={withProducts((catalogue: Product[]) => <AdminDashboard products={catalogue} user={user as User} />)} />
-          <Route path="orders" element={<AdminOrdersPage />} />
-          <Route path="orders/:id" element={<AdminOrderPage notify={notify} stockChanged={loadProducts} />} />
-          <Route path="products" element={withProducts((catalogue: Product[]) => <AdminProductsPage products={catalogue} />)} />
-          {['products/new', 'products/:id'].map((path: string) => (
-            <Route
-              key={path}
-              path={path}
-              element={withProducts((catalogue: Product[]) => <AdminProductEditor products={catalogue} productSaved={productSaved} notify={notify} />)}
-            />
-          ))}
-          <Route path="*" element={<AdminNotFound />} />
-        </Route>
-        {/* The store: its header, footer and WhatsApp button around every other page. */}
-        <Route
-          element={
-            <>
-              <Header cartCount={totals.count} wishlistCount={wishlist?.length ?? 0} openCart={openCart} user={user ?? null} products={products} />
-              <Outlet />
-              <Footer products={products} />
-              <WhatsAppButton />
-            </>
-          }
-        >
-          <Route
-            path="/"
-            element={<HomePage {...shopActions} products={products} catalogueError={catalogueError} reloadProducts={loadProducts} />}
-          />
-          <Route path="/about" element={<AboutPage products={products} />} />
-          <Route path="/products" element={withProducts((catalogue: Product[]) => <ProductsPage {...shopActions} products={catalogue} />)} />
-          <Route
-            path="/product/:id"
-            element={withProducts((catalogue: Product[]) => (
-              <ProductPage {...shopActions} products={catalogue} openCart={openCart} user={user} reloadProducts={loadProducts} />
-            ))}
-          />
-          <Route
-            path="/checkout"
-            element={requireUser((currentUser: User) =>
-              withProducts(() => (
-                <CheckoutPage
-                  cart={cart}
-                  totals={totals}
-                  user={currentUser}
-                  savedDelivery={orders?.[0]?.delivery}
-                  setQuantity={setQuantity}
-                  placeOrder={placeOrder}
-                />
-              )),
-            )}
-          />
-          <Route path="/login" element={<LoginPage user={user} signIn={signIn} signInWithGoogle={signInWithGoogle} />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage resetPassword={resetPassword} />} />
-          <Route
-            path="/profile"
-            element={requireUser((currentUser: User) => (
-              <ProfilePage
-                user={currentUser}
-                orders={orders ?? []}
-                signOut={signOut}
-                updatePreferences={updatePreferences}
-                saveName={saveName}
-                changePassword={changePassword}
+    <StoreInfoContext.Provider value={storeInfo}>
+      <div className="min-h-screen bg-canvas text-slate-800">
+        <Routes>
+          <Route path="/admin" element={requireAdmin((currentUser: User) => <AdminLayout user={currentUser} signOut={signOut} />)}>
+            <Route index element={withProducts((catalogue: Product[]) => <AdminDashboard products={catalogue} user={user as User} />)} />
+            <Route path="orders" element={<AdminOrdersPage />} />
+            <Route path="orders/:id" element={<AdminOrderPage notify={notify} stockChanged={loadProducts} />} />
+            <Route path="products" element={withProducts((catalogue: Product[]) => <AdminProductsPage products={catalogue} />)} />
+            {['products/new', 'products/:id'].map((path: string) => (
+              <Route
+                key={path}
+                path={path}
+                element={withProducts((catalogue: Product[]) => <AdminProductEditor products={catalogue} productSaved={productSaved} notify={notify} />)}
               />
             ))}
-          />
+            <Route path="*" element={<AdminNotFound />} />
+          </Route>
+          {/* The store: its header, footer and WhatsApp button around every other page. */}
           <Route
-            path="/wishlist"
-            element={requireUser(() =>
-              withProducts((catalogue: Product[]) => (
-                <WishlistPage {...shopActions} products={(wishlist ?? []).flatMap((id: number) => catalogue.filter((product: Product) => product.id === id))} />
-              )),
-            )}
-          />
-          <Route path="/orders" element={requireUser(() => <OrdersPage orders={orders ?? []} buyAgain={buyAgain} cancelOrder={cancelOrder} />)} />
-          <Route path="/orders/:id" element={requireUser(() => <OrderDetailsPage orders={orders ?? []} buyAgain={buyAgain} cancelOrder={cancelOrder} />)} />
-          <Route path="/policies/:slug" element={<PolicyPage />} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Route>
-      </Routes>
-      {/* Above the WhatsApp button on phones, where a long message would reach it. */}
-      <div aria-live="polite" className="print:hidden">
-        {notice && (
-          <div className="fixed bottom-24 left-1/2 z-50 flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg bg-navy py-2 pl-4 pr-2 text-sm font-semibold text-white shadow-xl sm:bottom-5">
-            {notice.error ? <CircleAlert size={17} className="shrink-0 text-rose-300" /> : <Check size={17} className="shrink-0 text-emerald-300" />}
-            <span className="min-w-0 truncate">{notice.message}</span>
-            {notice.action ? (
-              <button onClick={notice.action.run} className="shrink-0 rounded-md bg-white px-3 py-1.5 text-xs font-bold text-navy transition hover:bg-brand-soft">
-                {notice.action.label}
-              </button>
-            ) : (
-              <span className="pr-2" />
-            )}
-          </div>
-        )}
+            element={
+              <>
+                <Header cartCount={totals.count} wishlistCount={wishlist?.length ?? 0} openCart={openCart} user={user ?? null} products={products} />
+                <Outlet />
+                <Footer products={products} />
+                <WhatsAppButton />
+              </>
+            }
+          >
+            <Route
+              path="/"
+              element={<HomePage {...shopActions} products={products} catalogueError={catalogueError} reloadProducts={loadProducts} />}
+            />
+            <Route path="/about" element={<AboutPage products={products} />} />
+            <Route path="/products" element={withProducts((catalogue: Product[]) => <ProductsPage {...shopActions} products={catalogue} />)} />
+            <Route
+              path="/product/:id"
+              element={withProducts((catalogue: Product[]) => (
+                <ProductPage {...shopActions} products={catalogue} openCart={openCart} user={user} reloadProducts={loadProducts} />
+              ))}
+            />
+            <Route
+              path="/checkout"
+              element={requireUser((currentUser: User) =>
+                withProducts(() => (
+                  <CheckoutPage
+                    cart={cart}
+                    totals={totals}
+                    user={currentUser}
+                    savedDelivery={orders?.[0]?.delivery}
+                    setQuantity={setQuantity}
+                    placeOrder={placeOrder}
+                  />
+                )),
+              )}
+            />
+            <Route path="/login" element={<LoginPage user={user} signIn={signIn} signInWithGoogle={signInWithGoogle} />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage resetPassword={resetPassword} />} />
+            <Route
+              path="/profile"
+              element={requireUser((currentUser: User) => (
+                <ProfilePage
+                  user={currentUser}
+                  orders={orders ?? []}
+                  signOut={signOut}
+                  updatePreferences={updatePreferences}
+                  saveName={saveName}
+                  changePassword={changePassword}
+                />
+              ))}
+            />
+            <Route
+              path="/wishlist"
+              element={requireUser(() =>
+                withProducts((catalogue: Product[]) => (
+                  <WishlistPage {...shopActions} products={(wishlist ?? []).flatMap((id: number) => catalogue.filter((product: Product) => product.id === id))} />
+                )),
+              )}
+            />
+            <Route path="/orders" element={requireUser(() => <OrdersPage orders={orders ?? []} buyAgain={buyAgain} cancelOrder={cancelOrder} />)} />
+            <Route path="/orders/:id" element={requireUser(() => <OrderDetailsPage orders={orders ?? []} buyAgain={buyAgain} cancelOrder={cancelOrder} />)} />
+            <Route path="/policies/:slug" element={<PolicyPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
+        </Routes>
+        {/* Above the WhatsApp button on phones, where a long message would reach it. */}
+        <div aria-live="polite" className="print:hidden">
+          {notice && (
+            <div className="fixed bottom-24 left-1/2 z-50 flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg bg-navy py-2 pl-4 pr-2 text-sm font-semibold text-white shadow-xl sm:bottom-5">
+              {notice.error ? <CircleAlert size={17} className="shrink-0 text-rose-300" /> : <Check size={17} className="shrink-0 text-emerald-300" />}
+              <span className="min-w-0 truncate">{notice.message}</span>
+              {notice.action ? (
+                <button onClick={notice.action.run} className="shrink-0 rounded-md bg-white px-3 py-1.5 text-xs font-bold text-navy transition hover:bg-brand-soft">
+                  {notice.action.label}
+                </button>
+              ) : (
+                <span className="pr-2" />
+              )}
+            </div>
+          )}
+        </div>
+        <CartDrawer
+          open={cartOpen}
+          cart={cart}
+          totals={totals}
+          setOpen={setCartOpen}
+          setQuantity={setQuantity}
+          checkout={() => {
+            setCartOpen(false);
+            navigate('/checkout');
+          }}
+        />
       </div>
-      <CartDrawer
-        open={cartOpen}
-        cart={cart}
-        totals={totals}
-        setOpen={setCartOpen}
-        setQuantity={setQuantity}
-        checkout={() => {
-          setCartOpen(false);
-          navigate('/checkout');
-        }}
-      />
-    </div>
+    </StoreInfoContext.Provider>
   );
 }
 

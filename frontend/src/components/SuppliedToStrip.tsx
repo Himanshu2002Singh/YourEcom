@@ -1,13 +1,17 @@
 import { Link } from 'react-router';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Landmark, Leaf, PawPrint, Rocket, type LucideIcon } from 'lucide-react';
 import { panel } from '@/components/StoreShared';
-import { governmentBuyers, type Logo } from '@/data/company';
+import { useStoreInfo } from '@/hooks/useStoreInfo';
+import type { GovernmentBuyer } from '@/types/store';
+
+// The icons a buyer with no logo can name (GovernmentBuyer.icon). A name not listed here gets a government building.
+const buyerIcons: Record<string, LucideIcon> = { Rocket, Leaf, PawPrint };
 
 // A government buyer's logo, fitted into a box of the given size. One with no logo shows its icon in a round seal
 // as tall as the box instead, left out for screen readers since the name is always written beside it.
-export function BuyerLogo({ logo, alt, className }: { logo: Logo; alt: string; className: string }) {
-  if (typeof logo === 'string') return <img src={logo} alt={alt} className={`${className} object-contain`} />;
-  const Icon = logo;
+export function BuyerLogo({ buyer, alt, className }: { buyer: GovernmentBuyer; alt: string; className: string }) {
+  if (buyer.logo) return <img src={buyer.logo} alt={alt} className={`${className} object-contain`} />;
+  const Icon = buyerIcons[buyer.icon ?? ''] ?? Landmark;
   return (
     <span aria-hidden="true" className={`${className} flex items-center justify-center`}>
       <span className="flex aspect-square h-full items-center justify-center rounded-full border-2 border-navy/70 bg-white text-navy">
@@ -22,12 +26,13 @@ export function BuyerLogo({ logo, alt, className }: { logo: Logo; alt: string; c
 // evenly as a crest. The list is drawn twice so the loop never shows a gap; screen readers get it once. With
 // reduced motion it stays still and scrolls by hand.
 export function SuppliedToStrip() {
+  const { governmentBuyers } = useStoreInfo();
   const list = (copy: boolean) => (
     <ul aria-hidden={copy || undefined} className={`flex shrink-0 items-start ${copy ? 'motion-reduce:hidden' : ''}`}>
-      {governmentBuyers.map(([short, full, logo]) => (
-        <li key={short} title={full} className="flex w-36 shrink-0 flex-col items-center gap-2 px-2 text-center sm:w-40">
-          <BuyerLogo logo={logo} alt={copy ? '' : `${full} logo`} className="h-14 w-28" />
-          <span className="text-xs font-semibold leading-tight text-slate-700">{short}</span>
+      {governmentBuyers.map((buyer: GovernmentBuyer) => (
+        <li key={buyer.short} title={buyer.name} className="flex w-36 shrink-0 flex-col items-center gap-2 px-2 text-center sm:w-40">
+          <BuyerLogo buyer={buyer} alt={copy ? '' : `${buyer.name} logo`} className="h-14 w-28" />
+          <span className="text-xs font-semibold leading-tight text-slate-700">{buyer.short}</span>
         </li>
       ))}
     </ul>

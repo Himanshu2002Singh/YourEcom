@@ -2,11 +2,10 @@ import { Link } from 'react-router';
 import { ChevronRight, ExternalLink, Mail, MapPin, Phone, ReceiptText } from 'lucide-react';
 import { WhatsAppIcon, panel } from '@/components/StoreShared';
 import { BuyerLogo } from '@/components/SuppliedToStrip';
-import { ABOUT_TEXT, SUPPLY_TYPES, governmentBuyers, stockPhotos } from '@/data/company';
-import { ADDRESS, EMAIL, GSTIN, INDIAMART_LINK, MAP_LINK, PHONE, PHONE_LINK, whatsAppLink } from '@/data/contact';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { mapLink, useStoreInfo, whatsAppLink } from '@/hooks/useStoreInfo';
 import { categoryImage, categoryPath, storeCategories } from '@/lib/catalogue';
-import type { Product } from '@/types/store';
+import type { GovernmentBuyer, Product } from '@/types/store';
 
 const QUOTE_MESSAGE = 'Hello YourEcom, please send a quotation. Products and quantities: ';
 
@@ -16,6 +15,7 @@ const sectionTitle = 'text-lg font-bold text-slate-900 sm:text-xl';
 // sell and their business details.
 export function AboutPage({ products }: { products: Product[] | null }) {
   usePageTitle('About us');
+  const store = useStoreInfo();
   return (
     <main className="mx-auto max-w-[1400px] space-y-3 px-2 py-3 sm:px-4">
       <nav aria-label="Breadcrumb" className="flex items-center gap-1 px-1 text-xs text-slate-500">
@@ -30,9 +30,9 @@ export function AboutPage({ products }: { products: Product[] | null }) {
         <div className="px-5 py-8 sm:px-8 sm:py-10">
           <p className="text-xs font-bold uppercase tracking-widest text-cart">Medical disposable wholesaler · New Delhi</p>
           <h1 className="mt-2 text-3xl font-bold sm:text-4xl">About YourEcom</h1>
-          <p className="mt-4 max-w-2xl leading-7 text-blue-100">{ABOUT_TEXT}</p>
+          <p className="mt-4 max-w-2xl leading-7 text-blue-100">{store.aboutText}</p>
           <ul className="mt-5 flex flex-wrap gap-2" aria-label="How we supply">
-            {SUPPLY_TYPES.map((type) => (
+            {store.supplyTypes.map((type) => (
               <li key={type} className="rounded-full border border-white/30 px-3 py-1 text-xs font-bold">
                 {type}
               </li>
@@ -40,15 +40,15 @@ export function AboutPage({ products }: { products: Product[] | null }) {
           </ul>
           <div className="mt-6 flex flex-wrap gap-3">
             <a
-              href={whatsAppLink(QUOTE_MESSAGE)}
+              href={whatsAppLink(store, QUOTE_MESSAGE)}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-2 rounded-full bg-cart px-5 py-2.5 text-sm font-bold text-slate-900 transition hover:bg-cart-dark"
             >
               <WhatsAppIcon size={17} /> WhatsApp for a quote
             </a>
-            <a href={PHONE_LINK} className="inline-flex items-center gap-2 rounded-full border border-white/40 px-5 py-2.5 text-sm font-bold transition hover:bg-white/10">
-              <Phone size={16} /> {PHONE}
+            <a href={store.phoneLink} className="inline-flex items-center gap-2 rounded-full border border-white/40 px-5 py-2.5 text-sm font-bold transition hover:bg-white/10">
+              <Phone size={16} /> {store.phone}
             </a>
           </div>
         </div>
@@ -62,10 +62,10 @@ export function AboutPage({ products }: { products: Product[] | null }) {
         <h2 className={sectionTitle}>Supplied to government institutions</h2>
         <p className="mt-1 text-sm text-slate-500">Departments, forces, hospitals and research centres we have supplied.</p>
         <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {governmentBuyers.map(([short, full, logo]) => (
-            <li key={short} className="flex items-center gap-3 rounded-md border border-slate-200 p-3">
-              <BuyerLogo logo={logo} alt="" className="h-10 w-16 shrink-0" />
-              <span className="text-sm font-semibold leading-snug text-slate-800">{full}</span>
+          {store.governmentBuyers.map((buyer: GovernmentBuyer) => (
+            <li key={buyer.short} className="flex items-center gap-3 rounded-md border border-slate-200 p-3">
+              <BuyerLogo buyer={buyer} alt="" className="h-10 w-16 shrink-0" />
+              <span className="text-sm font-semibold leading-snug text-slate-800">{buyer.name}</span>
             </li>
           ))}
         </ul>
@@ -74,7 +74,7 @@ export function AboutPage({ products }: { products: Product[] | null }) {
       <section className={`${panel} p-5 sm:p-6`}>
         <h2 className={sectionTitle}>From our stock</h2>
         <ul className="mt-4 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
-          {stockPhotos.map(([src, alt]) => (
+          {store.stockPhotos.map(({ src, alt }) => (
             <li key={src}>
               <img src={src} alt={alt} loading="lazy" className="aspect-[4/3] w-full rounded object-cover" />
               <p className="mt-1.5 text-xs leading-snug text-slate-500">{alt}</p>
@@ -91,10 +91,10 @@ export function AboutPage({ products }: { products: Product[] | null }) {
           </Link>
         </div>
         <ul className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-          {storeCategories(products).map((category) => (
+          {storeCategories(products, store).map((category) => (
             <li key={category}>
               <Link to={categoryPath(category)} className="group block text-center">
-                <img src={categoryImage(category, products)} alt="" loading="lazy" className="aspect-square w-full rounded-md border border-slate-200 object-cover transition group-hover:border-brand" />
+                <img src={categoryImage(category, products, store)} alt="" loading="lazy" className="aspect-square w-full rounded-md border border-slate-200 object-cover transition group-hover:border-brand" />
                 <span className="mt-1.5 block text-xs font-medium leading-tight text-slate-800 group-hover:text-brand sm:text-sm">{category}</span>
               </Link>
             </li>
@@ -107,33 +107,33 @@ export function AboutPage({ products }: { products: Product[] | null }) {
           Business details
         </h2>
         <address className="grid gap-5 p-5 text-sm not-italic text-slate-700 sm:grid-cols-2 sm:p-6 lg:grid-cols-4">
-          <a href={MAP_LINK} target="_blank" rel="noreferrer" className="flex gap-2.5 hover:text-brand">
+          <a href={mapLink(store)} target="_blank" rel="noreferrer" className="flex gap-2.5 hover:text-brand">
             <MapPin size={18} className="mt-0.5 shrink-0 text-brand" />
             <span>
               <strong className="block text-slate-900">Address</strong>
-              {ADDRESS[0]}, {ADDRESS[1]}
+              {store.address.join(', ')}
             </span>
           </a>
-          <a href={PHONE_LINK} className="flex gap-2.5 hover:text-brand">
+          <a href={store.phoneLink} className="flex gap-2.5 hover:text-brand">
             <Phone size={18} className="mt-0.5 shrink-0 text-brand" />
             <span>
               <strong className="block text-slate-900">Call / WhatsApp</strong>
-              {PHONE}
+              {store.phone}
             </span>
           </a>
-          <a href={`mailto:${EMAIL}`} className="flex gap-2.5 hover:text-brand">
+          <a href={`mailto:${store.email}`} className="flex gap-2.5 hover:text-brand">
             <Mail size={18} className="mt-0.5 shrink-0 text-brand" />
             <span>
               <strong className="block text-slate-900">Email</strong>
-              {EMAIL}
+              {store.email}
             </span>
           </a>
           <div className="flex gap-2.5">
             <ReceiptText size={18} className="mt-0.5 shrink-0 text-brand" />
             <span>
               <strong className="block text-slate-900">GSTIN</strong>
-              {GSTIN}
-              <a href={INDIAMART_LINK} target="_blank" rel="noreferrer" className="mt-1 flex items-center gap-1 font-medium text-brand hover:underline">
+              {store.gstin}
+              <a href={store.indiamartLink} target="_blank" rel="noreferrer" className="mt-1 flex items-center gap-1 font-medium text-brand hover:underline">
                 Our IndiaMART profile <ExternalLink size={13} />
               </a>
             </span>

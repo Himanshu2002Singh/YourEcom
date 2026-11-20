@@ -1,14 +1,15 @@
 import { Link, useParams } from 'react-router';
 import { Phone } from 'lucide-react';
 import { WhatsAppIcon } from '@/components/StoreShared';
-import { PHONE, PHONE_LINK, whatsAppLink } from '@/data/contact';
-import { POLICIES_UPDATED, policies, type Policy } from '@/data/policies';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { useStoreInfo, whatsAppLink } from '@/hooks/useStoreInfo';
 import { NotFoundPage } from '@/pages/NotFoundPage';
+import type { Policy } from '@/types/store';
 
 export function PolicyPage() {
   const { slug } = useParams();
-  const policy = policies.find((item: Policy) => item.slug === slug);
+  const store = useStoreInfo();
+  const policy = store.policies.find((item: Policy) => item.slug === slug);
   usePageTitle(policy?.title ?? 'Page not found');
 
   if (!policy) return <NotFoundPage />;
@@ -18,9 +19,9 @@ export function PolicyPage() {
       <p className="text-sm font-semibold uppercase tracking-wider text-leaf">Policies</p>
       <h1 className="mt-2 text-4xl font-semibold text-navy">{policy.title}</h1>
       <p className="mt-3 text-lg leading-8 text-slate-500">{policy.summary}</p>
-      <p className="mt-2 text-xs font-semibold text-slate-400">Last updated {POLICIES_UPDATED}</p>
+      <p className="mt-2 text-xs font-semibold text-slate-400">Last updated {store.policiesUpdated}</p>
       <nav aria-label="Other policies" className="mt-6 flex flex-wrap gap-2">
-        {policies.map((item: Policy) => (
+        {store.policies.map((item: Policy) => (
           <Link
             key={item.slug}
             to={`/policies/${item.slug}`}
@@ -46,10 +47,10 @@ export function PolicyPage() {
       <div className="mt-6 rounded-xl bg-brand-soft p-6 text-sm text-slate-600">
         <p className="font-semibold text-navy">Questions about this policy?</p>
         <p className="mt-3 flex flex-wrap gap-x-6 gap-y-2 font-bold">
-          <a href={PHONE_LINK} className="inline-flex items-center gap-2 text-brand hover:underline">
-            <Phone size={15} /> {PHONE}
+          <a href={store.phoneLink} className="inline-flex items-center gap-2 text-brand hover:underline">
+            <Phone size={15} /> {store.phone}
           </a>
-          <a href={whatsAppLink()} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-brand hover:underline">
+          <a href={whatsAppLink(store)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-brand hover:underline">
             <WhatsAppIcon size={15} /> Chat on WhatsApp
           </a>
         </p>

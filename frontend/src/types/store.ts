@@ -1,4 +1,4 @@
-// A category's name: one of the store's own (data/categories.ts) or one an admin added with a product.
+// A category's name: one of the store's own (StoreInfo.categories) or one an admin added with a product.
 export type Category = string;
 
 // How a product sells in bulk: a pack's price before GST, the GST percentage added on top, and the fewest packs
@@ -87,3 +87,29 @@ export type AdminOrderList = { orders: AdminOrder[]; total: number; page: number
 // GET /api/admin/summary. Sales are order totals, leaving out cancelled orders.
 export type SalesTotal = { orders: number; sales: number };
 export type AdminSummary = { counts: Record<OrderStatus, number>; today: SalesTotal; last30Days: SalesTotal };
+
+// A government buyer the client has supplied: a short name for tight spaces, the full name, and its logo's path
+// (frontend/public/logos) or, for one with no logo, the name of a lucide icon of its work.
+export type GovernmentBuyer = { short: string; name: string; logo?: string; icon?: string };
+
+// A policy page (/policies/:slug).
+export type Policy = { slug: string; title: string; summary: string; sections: { heading: string; paragraphs: string[] }[] };
+
+// GET /api/store: the store's own details, which every page can show (hooks/useStoreInfo.ts).
+export type StoreInfo = {
+  phone: string;
+  phoneLink: string; // tel: link
+  email: string;
+  address: string[]; // its lines
+  gstin: string;
+  indiamartLink: string;
+  whatsappNumber: string; // country code and number, digits only
+  aboutText: string;
+  supplyTypes: string[];
+  governmentBuyers: GovernmentBuyer[];
+  stockPhotos: { src: string; alt: string }[];
+  categories: { name: Category; image: string }[]; // in store order, each with the photo that stands for it
+  nonMedicalCategory: Category; // its products say they aren't medical wherever they're shown
+  policies: Policy[];
+  policiesUpdated: string;
+};

@@ -4,8 +4,8 @@ import { ExternalLink, ImagePlus, LoaderCircle, Plus, Star, Trash2, X } from 'lu
 import { BackLink, PageHeader, adminCard, adminMain, primaryButton, secondaryButton } from '@/components/AdminLayout';
 import { Price } from '@/components/StoreShared';
 import { TextField } from '@/components/TextField';
-import { categories } from '@/data/categories';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { useStoreInfo } from '@/hooks/useStoreInfo';
 import { api, type ApiError } from '@/lib/api';
 import { MAX_QUANTITY } from '@/lib/cart';
 import { byCategoryOrder } from '@/lib/catalogue';
@@ -231,6 +231,7 @@ function ProductEditor({ id, products, productSaved, notify }: EditorProps & { i
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [newCategory, setNewCategory] = useState(false); // typing a category the store doesn't have yet
+  const store = useStoreInfo();
   usePageTitle(existing ? `${existing.name} · Admin` : id ? 'Product not found · Admin' : 'Add a product · Admin');
 
   if (id && !existing) {
@@ -249,7 +250,9 @@ function ProductEditor({ id, products, productSaved, notify }: EditorProps & { i
 
   // The store's categories and any an admin added, in store order. A new one typed in a different case
   // ("gloves") is saved as the one the store has.
-  const categoryChoices = [...new Set<string>([...categories, ...products.map((product: Product) => product.category)])].sort(byCategoryOrder);
+  const categoryChoices = [
+    ...new Set<string>([...store.categories.map(({ name }) => name), ...products.map((product: Product) => product.category)]),
+  ].sort(byCategoryOrder(store));
   const typedCategory = form.category.trim().replace(/\s+/g, ' ').toLowerCase();
   const sameCategory = newCategory ? categoryChoices.find((name: string) => name.toLowerCase() === typedCategory) : undefined;
   const chooseCategory = (event: ChangeEvent<HTMLSelectElement>): void => {

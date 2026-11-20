@@ -1,12 +1,7 @@
-import { PHONE } from '@/data/contact';
-
-// Calls the YourEcom API (backend/) on this site's own /api path; in development Vite passes
-// those requests on to the backend (vite.config.ts). The session is an HttpOnly cookie, so
-// the browser sends it with every request by itself.
-
-// The Vercel site is built without an API until the backend is hosted (VITE_NO_API in vercel.json):
-// it shows a copy of the catalogue, and anything that needs the API says ordering isn't open yet.
-export const NO_API = import.meta.env.VITE_NO_API === 'true';
+// Calls the YourEcom API (backend/) on this site's own /api path: in development Vite passes those requests on
+// to the backend (vite.config.ts), and on Vercel the root vercel.json passes them on to the hosted API at
+// api.youre-com.com. Being the site's own path, the API needs no CORS, and its session cookie belongs to the
+// site; the session is an HttpOnly cookie, so the browser sends it with every request by itself.
 
 export class ApiError extends Error {
   status: number;
@@ -29,7 +24,6 @@ function request(body: unknown): Pick<RequestInit, 'headers' | 'body'> {
 
 // Resolves with the JSON the API answers, or rejects with an ApiError whose message can be shown as-is.
 export async function api<T>(path: string, { method = 'GET', body }: Options = {}): Promise<T> {
-  if (NO_API) throw new ApiError(`Online ordering isn’t open yet. To order, call or WhatsApp us on ${PHONE}.`, 0);
   let response: Response;
   try {
     response = await fetch(`/api${path}`, { method, ...request(body) });

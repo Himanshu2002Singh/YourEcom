@@ -1,8 +1,8 @@
 import { Link, useParams } from 'react-router';
 import { ArrowLeft, Check, MapPin, Printer, Receipt, X } from 'lucide-react';
 import { OrderActions, OrderItemList, StatusPill } from '@/components/OrderParts';
-import { ADDRESS, PHONE } from '@/data/contact';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { useStoreInfo } from '@/hooks/useStoreInfo';
 import { deliveryLabels, formatDateTime, paymentLabels } from '@/lib/format';
 import { formatPrice } from '@/lib/pricing';
 import { NotFoundPage } from '@/pages/NotFoundPage';
@@ -57,6 +57,7 @@ function OrderProgress({ order }: { order: Order }) {
 export function OrderDetailsPage({ orders, buyAgain, cancelOrder }: OrderDetailsPageProps) {
   const { id } = useParams();
   const order = orders.find((placed: Order) => placed.id === id);
+  const { address, phone } = useStoreInfo();
   usePageTitle(order ? `Order #${order.id}` : 'Page not found');
 
   if (!order) return <NotFoundPage />;
@@ -71,7 +72,7 @@ export function OrderDetailsPage({ orders, buyAgain, cancelOrder }: OrderDetails
       <div className="mb-8 hidden border-b border-slate-200 pb-5 print:block">
         <p className="text-2xl font-bold text-navy">YourEcom · Invoice</p>
         <p className="mt-1 text-sm text-slate-500">
-          {ADDRESS.join(', ')} · {PHONE}
+          {address.join(', ')} · {phone}
         </p>
       </div>
       <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">

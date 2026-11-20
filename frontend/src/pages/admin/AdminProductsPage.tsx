@@ -3,6 +3,7 @@ import { ChevronRight, PackageSearch, Plus, Search } from 'lucide-react';
 import { LOW_STOCK, PageHeader, Pagination, adminCard, adminMain, primaryButton } from '@/components/AdminLayout';
 import { Price } from '@/components/StoreShared';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { useStoreInfo } from '@/hooks/useStoreInfo';
 import { matchesSearch, storeCategories } from '@/lib/catalogue';
 import { formatPrice } from '@/lib/pricing';
 import type { Product } from '@/types/store';
@@ -44,7 +45,7 @@ export function AdminProductsPage({ products }: { products: Product[] }) {
   const search = params.get('q') ?? '';
   const category = params.get('category') ?? '';
   const stock = (params.get('stock') ?? '') as Stock;
-  const shopCategories = storeCategories(products);
+  const shopCategories = storeCategories(products, useStoreInfo());
 
   // Changes the filters in the address; an empty value removes one. Any filter change starts again at page 1.
   const change = (values: Record<string, string>): void => {

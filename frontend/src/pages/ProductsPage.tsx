@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router';
 import { ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { ProductCard, panel, type ShopActions } from '@/components/StoreShared';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { useStoreInfo } from '@/hooks/useStoreInfo';
 import { byCategory, categoryPath, discountOf, groupByFamily, matchesSearch, storeCategories, type ProductGroup } from '@/lib/catalogue';
 import type { Category, Product } from '@/types/store';
 
@@ -26,12 +27,13 @@ const priceBands: [string, string, number, number][] = [
 const lowestPrice = (group: ProductGroup): number => Math.min(...group.map((product: Product) => product.price));
 const bestDiscount = (group: ProductGroup): number => Math.max(...group.map(discountOf));
 
-const compareGroups: Record<Sort, (a: ProductGroup, b: ProductGroup) => number> = {
-  relevance: (a: ProductGroup, b: ProductGroup) => byCategory(a[0], b[0]),
+// Relevance is the store's own order of products (lib/catalogue.ts).
+const compareGroups = (storeOrder: (a: Product, b: Product) => number): Record<Sort, (a: ProductGroup, b: ProductGroup) => number> => ({
+  relevance: (a: ProductGroup, b: ProductGroup) => storeOrder(a[0], b[0]),
   'price-low': (a: ProductGroup, b: ProductGroup) => lowestPrice(a) - lowestPrice(b),
   'price-high': (a: ProductGroup, b: ProductGroup) => lowestPrice(b) - lowestPrice(a),
   discount: (a: ProductGroup, b: ProductGroup) => bestDiscount(b) - bestDiscount(a),
-};
+});
 
 type ProductsPageProps = ShopActions & { products: Product[] };
 
@@ -41,7 +43,8 @@ export function ProductsPage({ products, ...shop }: ProductsPageProps) {
   const [params, setParams] = useSearchParams();
   const [filtersOpen, setFiltersOpen] = useState(false);
   const query = (params.get('q') ?? '').trim();
-  const shopCategories = storeCategories(products);
+  const store = useStoreInfo();
+  const shopCategories = storeCategories(products, store);
   const category = shopCategories.find((name) => name === params.get('category')) ?? null;
   const sort = sorts.find(([value]) => value === params.get('sort'))?.[0] ?? 'relevance';
   const band = priceBands.find(([value]) => value === params.get('price')) ?? null;
@@ -54,7 +57,7 @@ export function ProductsPage({ products, ...shop }: ProductsPageProps) {
     (product: Product) => matchesSearch(product, term) && (!band || (product.price >= band[2] && product.price <= band[3])) && (!inStockOnly || product.stock > 0),
   );
   const countIn = (name: Category): number => groupByFamily(matching.filter((product: Product) => product.category === name)).length;
-  const shown = groupByFamily(matching.filter((product: Product) => !category || product.category === category)).sort(compareGroups[sort]);
+  const shown = groupByFamily(matching.filter((product: Product) => !category || product.category === category)).sort(compareGroups(byCategory(store))[sort]);
   const filtered = Boolean(category || band || inStockOnly);
 
   const update = (key: string, value: string | null): void => {
