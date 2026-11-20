@@ -1,6 +1,6 @@
 import { Fragment, useState, type ChangeEvent, type FocusEvent, type FormEvent } from 'react';
 import { Link } from 'react-router';
-import { ArrowLeft, ArrowRight, Check, CreditCard, LockKeyhole, MapPin, PackageCheck, ShoppingCart, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, MapPin, PackageCheck, ShoppingCart, type LucideIcon } from 'lucide-react';
 import { CouponBox } from '@/components/CouponBox';
 import { QuantityStepper } from '@/components/QuantityStepper';
 import { BulkTag } from '@/components/StoreShared';
@@ -63,8 +63,9 @@ const deliveryFields: {
   },
 ];
 
+// Cash on delivery only, until a payment gateway takes card and UPI payments: the API also accepts 'online',
+// but nothing would collect the money yet.
 const paymentOptions: { value: PaymentMethod; title: string; description: string; icon: LucideIcon }[] = [
-  { value: 'online', title: 'Card / UPI', description: 'Secure online payment', icon: CreditCard },
   { value: 'cod', title: 'Cash on delivery', description: 'Pay in cash when your order arrives', icon: PackageCheck },
 ];
 
@@ -74,7 +75,7 @@ const errorFor = (field: Field, value: string): string | undefined => deliveryFi
 
 export function CheckoutPage({ cart, totals: cartTotals, user, savedDelivery, setQuantity, placeOrder }: CheckoutPageProps) {
   const [step, setStep] = useState(1);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('online');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
   const [form, setForm] = useState<DeliveryDetails>(savedDelivery ?? { name: user.name, phone: '', address: '', city: '', pincode: '' });
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
@@ -219,9 +220,6 @@ export function CheckoutPage({ cart, totals: cartTotals, user, savedDelivery, se
                   {orderError}
                 </p>
               )}
-              <p className="mt-4 flex items-center justify-center gap-2 text-xs font-semibold text-slate-400">
-                <LockKeyhole size={14} /> Your payment information is protected
-              </p>
             </>
           )}
         </section>
