@@ -6,6 +6,7 @@ import path from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import app from '../app.js';
 import { closeDb, query } from '../db/pool.js';
+import { DELIVERY_FEE, FREE_DELIVERY_THRESHOLD } from '../services/pricing.service.js';
 import { UPLOAD_DIR } from '../utils/uploads.js';
 import * as User from '../models/user.model.js';
 
@@ -134,6 +135,29 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
 
   test('the health check reaches the database', async () => {
     assert.deepEqual(await call('/health'), { status: 200, body: { ok: true }, cookie: undefined });
+  });
+
+  test('the store’s details are seeded and served to every page', async () => {
+    const { status, body } = await call('/store');
+    assert.equal(status, 200);
+    const { store } = body;
+    assert.deepEqual(Object.keys(store).sort(), [
+      'aboutText', 'address', 'categories', 'email', 'governmentBuyers', 'gstin', 'indiamartLink', 'nonMedicalCategory',
+      'phone', 'phoneLink', 'policies', 'policiesUpdated', 'stockPhotos', 'supplyTypes', 'whatsappNumber',
+    ]);
+    assert.deepEqual([store.phone, store.phoneLink, store.whatsappNumber], ['+91 70005 90408', 'tel:+917000590408', '917000590408']);
+    assert.deepEqual(store.address, ['26-27, Block R3-B, Mohan Garden', 'Uttam Nagar, New Delhi 110059']);
+    assert.match(store.aboutText, /^Founded in 2024, YourEcom/);
+    assert.deepEqual(store.categories[0], { name: 'Syringes', image: '/photos/syringe-without-needle.jpg' });
+    assert.equal(store.categories.at(-1).name, store.nonMedicalCategory, 'the non-medical category comes last');
+    assert.ok(store.governmentBuyers.every(buyer => buyer.short && buyer.name && Boolean(buyer.logo) !== Boolean(buyer.icon)), 'each buyer has a logo or an icon');
+    assert.deepEqual(store.governmentBuyers[1], { short: 'VSSC', name: 'Vikram Sarabhai Space Centre (VSSC)', icon: 'Rocket' });
+    assert.ok(store.stockPhotos.every(photo => photo.src.startsWith('/photos/') && photo.alt));
+
+    assert.deepEqual(store.policies.map(policy => policy.slug), ['shipping', 'returns', 'privacy', 'terms']);
+    const [threshold, fee] = [FREE_DELIVERY_THRESHOLD, DELIVERY_FEE].map(amount => `₹${amount.toLocaleString('en-IN')}`);
+    assert.equal(store.policies[0].sections[1].paragraphs[0], `Delivery is free on orders of ${threshold} or more. Below that, delivery costs ${fee} per order.`, 'the policy matches the pricing');
+    assert.match(store.policies[1].sections[1].paragraphs[0], /other customers’ hygiene/, 'quotes in the text survive the seed');
   });
 
   test('the storefront’s products are seeded and filter by category and search text', async () => {

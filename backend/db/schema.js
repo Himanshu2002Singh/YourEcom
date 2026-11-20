@@ -1,7 +1,9 @@
 // Every table, as SQL that is safe to run again and again. The API runs it once per process,
 // just before its first query (db/pool.js), so a deploy that adds tables needs no manual step.
 // `npm run db:setup` runs it by hand and also creates the database itself.
-export const SCHEMA = `
+import { escape } from 'mysql2/promise';
+
+const TABLES = `
 CREATE TABLE IF NOT EXISTS users (
   id            CHAR(36)     NOT NULL PRIMARY KEY,
   email         VARCHAR(254) NOT NULL UNIQUE,
@@ -539,4 +541,214 @@ CREATE TABLE IF NOT EXISTS reviews (
   CONSTRAINT reviews_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
   CONSTRAINT reviews_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
 );
+`;
+
+// The store's own details, which every page of the storefront loads from GET /api/store: how customers reach
+// the client (as printed on their posters and business card; the phone number is the one they gave on 2026-11-03,
+// which is also their WhatsApp number), who they are, the government buyers they have supplied, their stock
+// photos, the categories and the policy pages. Like the products, this is only the starting set: each start adds
+// the names that are missing and leaves existing rows alone, because a row that exists belongs to the admin.
+// Photos and logos are files in frontend/public; only their paths are kept here.
+const STORE_INFO = {
+  phone: '+91 70005 90408',
+  phone_link: 'tel:+917000590408',
+  email: 'yourecom69@gmail.com',
+  address: ['26-27, Block R3-B, Mohan Garden', 'Uttam Nagar, New Delhi 110059'],
+  // From the client's IndiaMART profile, for buyers who check a supplier's registration.
+  gstin: '07AZMPR3055K1ZV',
+  indiamart_link: 'https://www.indiamart.com/yourecom/',
+  // For https://wa.me/<number> links: the country code and number, digits only.
+  whatsapp_number: '917000590408',
+
+  // Who YourEcom is, in the client's own words (their message of 2026-11-03), and how their posters describe the trade.
+  about_text:
+    'Founded in 2024, YourEcom is a leading wholesaler and supplier of premium surgical disposable products. Our mission is to support healthcare professionals with reliable and high-quality disposable items that are essential for maintaining hygiene and safety in medical settings. We take pride in our commitment to excellence, ensuring that all our products meet the rigorous standards of the healthcare industry.',
+  supply_types: ['Wholesale', 'Retail', 'Government supply', 'Local supply'],
+
+  // The government buyers the client has supplied (their list of 2026-11-03): a short name for tight spaces, the
+  // full name, and its logo (frontend/public/logos, from Wikimedia Commons). Military Hospital shows the Army
+  // Medical Corps crest, and the Ministry of AYUSH the State Emblem from its own logo, whose text repeats the name.
+  // VSSC, NRIBAS and the veterinary services have no logo online, so they name a lucide icon of their work instead,
+  // which the storefront draws (components/SuppliedToStrip.tsx). The client asked for the logos on 2026-11-20,
+  // knowing several crests carry the State Emblem, whose use on a business's site is restricted.
+  government_buyers: [
+    { short: 'ISRO', name: 'Indian Space Research Organisation (ISRO)', logo: '/logos/isro.webp' },
+    { short: 'VSSC', name: 'Vikram Sarabhai Space Centre (VSSC)', icon: 'Rocket' },
+    { short: 'Indian Navy', name: 'Indian Navy', logo: '/logos/indian-navy.webp' },
+    { short: 'Indian Air Force', name: 'Indian Air Force', logo: '/logos/indian-air-force.webp' },
+    { short: 'ITBP', name: 'Indo-Tibetan Border Police (ITBP)', logo: '/logos/itbp.webp' },
+    { short: 'Military Hospital', name: 'Military Hospital', logo: '/logos/army-medical-corps.webp' },
+    { short: 'ESIC Hospital', name: 'ESIC Hospital', logo: '/logos/esic.webp' },
+    { short: 'Ministry of AYUSH', name: 'Ministry of AYUSH', logo: '/logos/ministry-of-ayush.webp' },
+    { short: 'NRIBAS', name: 'National Research Institute of Basic Ayurvedic Sciences (NRIBAS)', icon: 'Leaf' },
+    { short: 'Veterinary Services, Indravati', name: 'Veterinary Services, Indravati', icon: 'PawPrint' },
+  ],
+
+  // The client's photos of their stock, for the About page.
+  stock_photos: [
+    { src: '/photos/stock-packing-room.jpg', alt: 'Cartons and bags of syringes' },
+    { src: '/photos/stock-syringe-bags.jpg', alt: 'Bags of loose syringes' },
+    { src: '/photos/stock-ivlife-pallets.jpg', alt: 'Pallets of ivlife IV fluid cartons, 25 bottles each' },
+    { src: '/photos/warehouse-stock.jpg', alt: 'Medical disposables in stock' },
+  ],
+
+  // The store's categories in the order the storefront shows them (syringes, the client's main line, first; the
+  // non-medical party and toy syringes last), each with the client's photo that stands for it. The store lists
+  // whichever categories have products, so one an admin adds with a product shows too, before the non-medical
+  // one, with its first product's photo.
+  categories: [
+    { name: 'Syringes', image: '/photos/syringe-without-needle.jpg' },
+    { name: 'IV Cannula', image: '/photos/iv-cannula.jpg' },
+    { name: 'IV Sets', image: '/photos/scalp-vein-set.jpg' },
+    { name: 'IV Fluids', image: '/photos/iv-fluids-ivlife.jpg' },
+    { name: 'Gloves', image: '/photos/gloves-latex-nitrile.jpg' },
+    { name: 'Face Masks', image: '/photos/mask-cap-mannequin.jpg' },
+    { name: 'Caps & Shoe Covers', image: '/photos/shoe-covers.jpg' },
+    { name: 'Bandages & Gauze', image: '/photos/crepe-bandage.jpg' },
+    { name: 'Surgical Tapes', image: '/photos/micropore-tape.jpg' },
+    { name: 'Lab Disposables', image: '/photos/tube-k3-edta.jpg' },
+    { name: 'Toys & Party Syringes', image: '/photos/doctor-play-set-square.jpg' },
+  ],
+  // The one category that isn't medical: its products say so wherever they're shown.
+  non_medical_category: 'Toys & Party Syringes',
+
+  // The policy pages (/policies/:slug), written to match how the site and the API work. The delivery charges
+  // repeat the API's pricing (services/pricing.service.js), so a change there needs a change here too.
+  policies_updated: '29 October 2026',
+  policies: [
+    {
+      slug: 'shipping',
+      title: 'Shipping and delivery',
+      summary: 'Where we deliver, what delivery costs and when your order leaves our warehouse.',
+      sections: [
+        {
+          heading: 'Where we deliver',
+          paragraphs: ['We deliver across India to any address with a valid 6-digit pincode. Enter the full address and a 10-digit mobile number at checkout so the courier can reach you.'],
+        },
+        {
+          heading: 'Delivery charges',
+          paragraphs: [
+            'Delivery is free on orders of ₹2,500 or more. Below that, delivery costs ₹99 per order.',
+            'Free delivery goes by the value of the items before any coupon, so applying a coupon never adds a delivery charge.',
+          ],
+        },
+        {
+          heading: 'When your order ships',
+          paragraphs: [
+            'Orders are packed and shipped within 1–2 business days. How long delivery takes after that depends on your pincode.',
+            'You can follow every order under My orders, where each order shows whether it is being packed and shipped, delivered or cancelled.',
+          ],
+        },
+        {
+          heading: 'Bulk orders',
+          paragraphs: ['For hospital, clinic or other large orders, call or email us and we will arrange delivery and pricing with you directly.'],
+        },
+      ],
+    },
+    {
+      slug: 'returns',
+      title: 'Cancellations, returns and refunds',
+      summary: 'How to cancel an order, and what to do if something arrives damaged or wrong.',
+      sections: [
+        {
+          heading: 'Cancelling an order',
+          paragraphs: [
+            'You can cancel an order yourself from My orders until it has been delivered. The cancellation is immediate and there is nothing to pay.',
+            'If you paid online, the full amount is refunded to the same card or UPI account. If you chose cash on delivery, no payment is collected.',
+          ],
+        },
+        {
+          heading: 'Returns',
+          paragraphs: [
+            'For your safety and other customers’ hygiene, medical disposables cannot be returned once their packaging has been opened.',
+            'If an item arrives damaged, defective or different from what you ordered, tell us within 7 days of delivery with your order number and a photo. We will replace it or refund it in full.',
+          ],
+        },
+        {
+          heading: 'Refunds',
+          paragraphs: ['Approved refunds are sent within 5–7 business days: online payments to the original card or UPI account, cash-on-delivery orders by bank transfer or UPI.'],
+        },
+      ],
+    },
+    {
+      slug: 'privacy',
+      title: 'Privacy policy',
+      summary: 'What we keep about you, why, and who sees it.',
+      sections: [
+        {
+          heading: 'What we keep',
+          paragraphs: [
+            'Your account: your name, email address and password. The password is stored only as a salted hash, so nobody at YourEcom can read it.',
+            'Your orders: what you bought, what you paid and the delivery details you entered (name, phone number, address, city and pincode). Your most recent delivery details are offered again at your next checkout.',
+            'Your wishlist, your product reviews, the coupons you have used and your account preferences.',
+          ],
+        },
+        {
+          heading: 'Cookies and your browser',
+          paragraphs: ['We use a single cookie to keep you signed in. Your cart is saved in your own browser, not on our servers. We do not use advertising or tracking cookies.'],
+        },
+        {
+          heading: 'Who sees it',
+          paragraphs: [
+            'Your delivery details are shared with the courier delivering your order and with nobody else. We never sell your personal data.',
+            'Reviews are public and show your first name and the first letter of your last name.',
+          ],
+        },
+        {
+          heading: 'Your choices',
+          paragraphs: ['You can change your name, password and preferences under My account at any time. To have your account and everything in it deleted, email us from the address you signed up with.'],
+        },
+      ],
+    },
+    {
+      slug: 'terms',
+      title: 'Terms of use',
+      summary: 'The rules for using YourEcom and buying from us.',
+      sections: [
+        {
+          heading: 'Your account',
+          paragraphs: ['Keep your password to yourself and your details accurate. You are responsible for orders placed from your account.'],
+        },
+        {
+          heading: 'Products',
+          paragraphs: ['Use every product as its packaging and instructions describe. Our product descriptions are general information, not medical advice: ask a healthcare professional when in doubt.'],
+        },
+        {
+          heading: 'Prices, stock and payment',
+          paragraphs: [
+            'Prices are in Indian rupees and include taxes. You pay the prices shown when you place your order, even if they change later. Stock is checked when you order, so we never take an order we cannot fill.',
+            'You can pay by card or UPI, or in cash when your order arrives.',
+          ],
+        },
+        {
+          heading: 'Coupons',
+          paragraphs: [
+            'One coupon can be used per order, and each code once per customer. A code from a cancelled order can be used again. Coupons have no cash value, and we may change or end an offer at any time; orders already placed keep their discount.',
+          ],
+        },
+        {
+          heading: 'Reviews',
+          paragraphs: ['Only customers who ordered a product can review it. Keep reviews honest and about the product; we may remove reviews that are abusive or misleading.'],
+        },
+        {
+          heading: 'Cancellations and returns',
+          paragraphs: ['These are covered by our cancellations, returns and refunds policy.'],
+        },
+      ],
+    },
+  ],
+};
+
+// The tables, then the store's details: one row per name in STORE_INFO, its value as JSON. The values are escaped
+// here, so quotes and backslashes in the text can't break the SQL.
+export const SCHEMA = `${TABLES}
+CREATE TABLE IF NOT EXISTS store_info (
+  name  VARCHAR(40) NOT NULL PRIMARY KEY,   -- as in STORE_INFO, e.g. 'phone' or 'policies'
+  value JSON        NOT NULL
+);
+
+INSERT IGNORE INTO store_info (name, value) VALUES
+${Object.entries(STORE_INFO)
+  .map(([name, value]) => `  (${escape(name)}, ${escape(JSON.stringify(value))})`)
+  .join(',\n')};
 `;

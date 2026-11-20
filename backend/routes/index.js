@@ -7,11 +7,13 @@ import couponRoutes from './coupon.routes.js';
 import meRoutes from './me.routes.js';
 import orderRoutes from './order.routes.js';
 import productRoutes from './product.routes.js';
+import storeRoutes from './store.routes.js';
 import wishlistRoutes from './wishlist.routes.js';
 
 const router = Router();
 
 router.get('/health', health);
+router.use('/store', storeRoutes);
 router.use('/auth', authRoutes);
 router.use('/me', meRoutes);
 router.use('/products', productRoutes);
