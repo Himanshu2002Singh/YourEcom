@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
-import { ChevronRight, ExternalLink, Landmark, Mail, MapPin, Phone, ReceiptText } from 'lucide-react';
+import { ChevronRight, ExternalLink, Mail, MapPin, Phone, ReceiptText } from 'lucide-react';
 import { WhatsAppIcon, panel } from '@/components/StoreShared';
+import { BuyerLogo } from '@/components/SuppliedToStrip';
 import { ABOUT_TEXT, SUPPLY_TYPES, governmentBuyers, stockPhotos } from '@/data/company';
 import { ADDRESS, EMAIL, GSTIN, INDIAMART_LINK, MAP_LINK, PHONE, PHONE_LINK, whatsAppLink } from '@/data/contact';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -61,11 +62,9 @@ export function AboutPage({ products }: { products: Product[] | null }) {
         <h2 className={sectionTitle}>Supplied to government institutions</h2>
         <p className="mt-1 text-sm text-slate-500">Departments, forces, hospitals and research centres we have supplied.</p>
         <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {governmentBuyers.map(([short, full]) => (
+          {governmentBuyers.map(([short, full, logo]) => (
             <li key={short} className="flex items-center gap-3 rounded-md border border-slate-200 p-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
-                <Landmark size={19} />
-              </span>
+              <BuyerLogo logo={logo} alt="" className="h-10 w-16 shrink-0" />
               <span className="text-sm font-semibold leading-snug text-slate-800">{full}</span>
             </li>
           ))}

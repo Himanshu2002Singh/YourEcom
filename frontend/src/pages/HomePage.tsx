@@ -1,8 +1,9 @@
 import { Link } from 'react-router';
 import { BadgeCheck, ChevronRight, Headset, Mail, MapPin, Phone, ShieldCheck, Truck, type LucideIcon } from 'lucide-react';
 import { LoadError, Loading, ProductCard, WhatsAppIcon, panel, type ShopActions } from '@/components/StoreShared';
+import { SuppliedToStrip } from '@/components/SuppliedToStrip';
 import { NON_MEDICAL_CATEGORY } from '@/data/categories';
-import { ABOUT_TEXT, governmentBuyers } from '@/data/company';
+import { ABOUT_TEXT } from '@/data/company';
 import { ADDRESS, EMAIL, MAP_LINK, PHONE, PHONE_LINK, whatsAppLink } from '@/data/contact';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { byCategory, categoryImage, categoryPath, discountOf, groupByFamily, groupName, storeCategories, variantSummary, type ProductGroup } from '@/lib/catalogue';
@@ -163,24 +164,6 @@ export function HomePage({ products, catalogueError, reloadProducts, ...shop }: 
                 </a>
               </div>
             </div>
-            <div className="relative flex flex-wrap items-baseline gap-x-6 gap-y-2 border-t border-white/10 bg-navy-dark/90 px-5 py-4 sm:px-8">
-              <Link to="/about#supplied-to" className="flex shrink-0 items-center gap-1 text-xs font-bold uppercase tracking-widest text-cart hover:underline">
-                Supplied to <ChevronRight size={14} />
-              </Link>
-              <ul className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm font-semibold">
-                {governmentBuyers.map(([short, full]) => (
-                  <li key={short}>
-                    {short === full ? (
-                      short
-                    ) : (
-                      <abbr title={full} className="no-underline">
-                        {short}
-                      </abbr>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
           </section>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -290,6 +273,9 @@ export function HomePage({ products, catalogueError, reloadProducts, ...shop }: 
           </a>
         </div>
       </section>
+
+      {/* Last on the page, just above the footer, as the client asked. */}
+      <SuppliedToStrip />
     </main>
   );
 }

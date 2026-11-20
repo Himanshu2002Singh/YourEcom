@@ -20,6 +20,13 @@ export default {
         sans: ['Roboto', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         logo: ['"Playfair Display"', 'Georgia', 'serif'],
       },
+      // A strip that scrolls by on its own: its content is there twice, so moving it half its width loops seamlessly.
+      keyframes: {
+        marquee: { to: { transform: 'translateX(-50%)' } },
+      },
+      animation: {
+        marquee: 'marquee 45s linear infinite',
+      },
     },
   },
   plugins: [],

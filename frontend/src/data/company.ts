@@ -1,3 +1,5 @@
+import { Leaf, PawPrint, Rocket, type LucideIcon } from 'lucide-react';
+
 // Who YourEcom is, in the client's own words (their message of 2026-11-03).
 export const ABOUT_TEXT =
   'Founded in 2024, YourEcom is a leading wholesaler and supplier of premium surgical disposable products. Our mission is to support healthcare professionals with reliable and high-quality disposable items that are essential for maintaining hygiene and safety in medical settings. We take pride in our commitment to excellence, ensuring that all our products meet the rigorous standards of the healthcare industry.';
@@ -5,19 +7,25 @@ export const ABOUT_TEXT =
 // How the client describes their trade on their posters.
 export const SUPPLY_TYPES = ['Wholesale', 'Retail', 'Government supply', 'Local supply'] as const;
 
-// The government buyers the client has supplied (their list of 2026-11-03), as a short name for tight spaces
-// and the full name. Names only: these bodies' crests and emblems may not be used to suggest they endorse a supplier.
-export const governmentBuyers: [short: string, full: string][] = [
-  ['ISRO', 'Indian Space Research Organisation (ISRO)'],
-  ['VSSC', 'Vikram Sarabhai Space Centre (VSSC)'],
-  ['Indian Navy', 'Indian Navy'],
-  ['Indian Air Force', 'Indian Air Force'],
-  ['ITBP', 'Indo-Tibetan Border Police (ITBP)'],
-  ['Military Hospital', 'Military Hospital'],
-  ['ESIC Hospital', 'ESIC Hospital'],
-  ['Ministry of AYUSH', 'Ministry of AYUSH'],
-  ['NRIBAS', 'National Research Institute of Basic Ayurvedic Sciences (NRIBAS)'],
-  ['Veterinary Services, Indravati', 'Veterinary Services, Indravati'],
+// A logo's path, or an icon of the buyer's work for the few with no logo to be found.
+export type Logo = string | LucideIcon;
+
+// The government buyers the client has supplied (their list of 2026-11-03): a short name for tight spaces, the
+// full name, and its logo (frontend/public/logos, from Wikimedia Commons). Military Hospital shows the Army Medical
+// Corps crest, and the Ministry of AYUSH the State Emblem from its own logo, whose text repeats the name. VSSC, NRIBAS
+// and the veterinary services have no logo online, so they show an icon of their work. The client asked for the
+// logos on 2026-11-20, knowing several crests carry the State Emblem, whose use on a business's site is restricted.
+export const governmentBuyers: [short: string, full: string, logo: Logo][] = [
+  ['ISRO', 'Indian Space Research Organisation (ISRO)', '/logos/isro.webp'],
+  ['VSSC', 'Vikram Sarabhai Space Centre (VSSC)', Rocket],
+  ['Indian Navy', 'Indian Navy', '/logos/indian-navy.webp'],
+  ['Indian Air Force', 'Indian Air Force', '/logos/indian-air-force.webp'],
+  ['ITBP', 'Indo-Tibetan Border Police (ITBP)', '/logos/itbp.webp'],
+  ['Military Hospital', 'Military Hospital', '/logos/army-medical-corps.webp'],
+  ['ESIC Hospital', 'ESIC Hospital', '/logos/esic.webp'],
+  ['Ministry of AYUSH', 'Ministry of AYUSH', '/logos/ministry-of-ayush.webp'],
+  ['NRIBAS', 'National Research Institute of Basic Ayurvedic Sciences (NRIBAS)', Leaf],
+  ['Veterinary Services, Indravati', 'Veterinary Services, Indravati', PawPrint],
 ];
 
 // The client's photos of their stock, for the About page (its banner uses /photos/stock-cartons.jpg).
