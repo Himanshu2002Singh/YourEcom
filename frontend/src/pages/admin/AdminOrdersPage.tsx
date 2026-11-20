@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router';
 import { PackageOpen, Search } from 'lucide-react';
 import { PageHeader, Pagination, adminCard, adminMain } from '@/components/AdminLayout';
 import { StatusPill } from '@/components/OrderParts';
-import { LoadError, Loading } from '@/components/StoreShared';
+import { BulkTag, LoadError, Loading } from '@/components/StoreShared';
 import { useApiData } from '@/hooks/useApiData';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { formatDateTime, paymentLabels } from '@/lib/format';
@@ -28,7 +28,11 @@ function OrderRow({ order }: { order: AdminOrder }) {
       <Link to={`/admin/orders/${order.id}`} className={`block px-4 py-3 transition hover:bg-brand-soft/60 sm:px-5 ${columns}`}>
         <span className="flex items-center justify-between gap-3 md:block">
           <span>
-            <span className="block font-semibold text-navy">#{order.id}</span>
+            <span className="block font-semibold text-navy">
+              #{order.id}
+              {/* Wholesale orders stand out in the queue. */}
+              {order.items.some((item) => item.bulk) && <BulkTag className="ml-1.5 bg-brand-soft text-brand" />}
+            </span>
             <span className="block text-xs text-slate-500">{formatDateTime(order.placedAt)}</span>
           </span>
           <span className="md:hidden">

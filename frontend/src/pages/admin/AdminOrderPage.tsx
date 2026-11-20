@@ -177,6 +177,12 @@ export function AdminOrderPage({ notify, stockChanged }: { notify: Notify; stock
                 <dt>Items ({pieces})</dt>
                 <dd>{formatPrice(order.subtotal)}</dd>
               </div>
+              {order.gst > 0 && (
+                <div className="flex justify-between gap-4">
+                  <dt>GST on bulk orders</dt>
+                  <dd>{formatPrice(order.gst)}</dd>
+                </div>
+              )}
               {order.discount > 0 && (
                 <div className="flex justify-between gap-4 text-leaf">
                   <dt>Coupon {order.couponCode}</dt>
