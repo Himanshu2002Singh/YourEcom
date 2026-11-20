@@ -1,10 +1,10 @@
 import { Link, useSearchParams } from 'react-router';
-import { ChevronRight, PackageSearch, Plus, Search } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronRight, PackageSearch, Plus, Search } from 'lucide-react';
 import { LOW_STOCK, PageHeader, Pagination, adminCard, adminMain, primaryButton } from '@/components/AdminLayout';
 import { Price } from '@/components/StoreShared';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { useStoreInfo } from '@/hooks/useStoreInfo';
-import { matchesSearch, storeCategories } from '@/lib/catalogue';
+import { byCategory, matchesSearch, storeCategories } from '@/lib/catalogue';
 import { formatPrice } from '@/lib/pricing';
 import type { Product } from '@/types/store';
 
@@ -18,6 +18,21 @@ const stockFilters: [Stock, string][] = [
 ];
 const inStockFilter = (product: Product, filter: Stock): boolean =>
   filter === 'low' ? product.stock <= LOW_STOCK : filter === 'out' ? product.stock === 0 : true;
+
+// The orders the list can be sorted in, kept in the address as ?sort=: a column, with a leading - for the other
+// way round. Without one it goes by product number, oldest first. Ties keep product-number order.
+type SortKey = 'id' | 'name' | 'price' | 'stock' | 'category';
+const sorts: [string, string][] = [
+  ['', 'Product number'],
+  ['-id', 'Newest first'],
+  ['name', 'Name, A to Z'],
+  ['-name', 'Name, Z to A'],
+  ['price', 'Price, low to high'],
+  ['-price', 'Price, high to low'],
+  ['stock', 'Stock, low to high'],
+  ['-stock', 'Stock, high to low'],
+  ['category', 'Category, store order'],
+];
 
 // The bulk terms under the retail price, for a product sold in bulk too.
 function BulkNote({ product }: { product: Product }) {
@@ -37,6 +52,24 @@ function StockBadge({ stock }: { stock: number }) {
 
 const columns = 'md:grid md:grid-cols-[minmax(0,1fr)_11rem_9rem_1.5rem] md:items-center md:gap-6';
 
+// A column heading that sorts by its column: once from low to high (A to Z), again the other way round.
+function SortHeading({ label, column, sort, onSort }: { label: string; column: SortKey; sort: string; onSort: (sort: string) => void }) {
+  const active = sort.replace('-', '') === column;
+  const descending = active && sort.startsWith('-');
+  const Arrow = descending ? ArrowDown : ArrowUp;
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(active && !descending ? `-${column}` : column)}
+      aria-label={`Sort by ${label.toLowerCase()}${active ? (descending ? ', high to low' : ', low to high') : ''}`}
+      className={`inline-flex items-center gap-1 uppercase tracking-wider transition hover:text-navy ${active ? 'text-navy' : ''}`}
+    >
+      {label}
+      <Arrow size={13} className={active ? '' : 'opacity-0'} />
+    </button>
+  );
+}
+
 // The catalogue, a page at a time, with search, category and stock filters kept in the address (so Back, and the
 // dashboard's low-stock links, land on the same view). Each row opens the product's own page to edit it.
 export function AdminProductsPage({ products }: { products: Product[] }) {
@@ -45,7 +78,9 @@ export function AdminProductsPage({ products }: { products: Product[] }) {
   const search = params.get('q') ?? '';
   const category = params.get('category') ?? '';
   const stock = (params.get('stock') ?? '') as Stock;
-  const shopCategories = storeCategories(products, useStoreInfo());
+  const sort = sorts.find(([value]) => value === params.get('sort'))?.[0] ?? '';
+  const store = useStoreInfo();
+  const shopCategories = storeCategories(products, store);
 
   // Changes the filters in the address; an empty value removes one. Any filter change starts again at page 1.
   const change = (values: Record<string, string>): void => {
@@ -58,9 +93,18 @@ export function AdminProductsPage({ products }: { products: Product[] }) {
   };
 
   const query = search.trim().toLowerCase();
-  const shown = products.filter(
-    (product: Product) => (!category || product.category === category) && inStockFilter(product, stock) && matchesSearch(product, query),
-  );
+  const compare: Record<SortKey, (a: Product, b: Product) => number> = {
+    id: (a, b) => a.id - b.id,
+    name: (a, b) => a.name.localeCompare(b.name),
+    price: (a, b) => a.price - b.price,
+    stock: (a, b) => a.stock - b.stock,
+    category: byCategory(store),
+  };
+  const direction = sort.startsWith('-') ? -1 : 1;
+  const sortBy = compare[(sort.replace('-', '') || 'id') as SortKey];
+  const shown = products
+    .filter((product: Product) => (!category || product.category === category) && inStockFilter(product, stock) && matchesSearch(product, query))
+    .sort((a: Product, b: Product) => direction * sortBy(a, b) || a.id - b.id);
   const pages = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
   const page = Math.min(pages, Math.max(1, Number(params.get('page')) || 1));
   const onPage = shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -103,6 +147,18 @@ export function AdminProductsPage({ products }: { products: Product[] }) {
             </option>
           ))}
         </select>
+        <select
+          value={sort}
+          onChange={(event) => change({ sort: event.target.value })}
+          aria-label="Sort by"
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm outline-none focus:border-brand"
+        >
+          {sorts.map(([value, label]) => (
+            <option key={value} value={value}>
+              Sort: {label}
+            </option>
+          ))}
+        </select>
         <div className="flex gap-1 rounded-lg bg-white p-1 shadow-sm" role="group" aria-label="Stock">
           {stockFilters.map(([value, label]) => (
             <button
@@ -120,9 +176,15 @@ export function AdminProductsPage({ products }: { products: Product[] }) {
 
       <section className={`mt-4 overflow-hidden ${adminCard}`}>
         <div className={`hidden border-b border-slate-100 bg-slate-50/60 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-400 ${columns}`}>
-          <span>Product</span>
-          <span>Price</span>
-          <span>Stock</span>
+          <span>
+            <SortHeading label="Product" column="name" sort={sort} onSort={(next: string) => change({ sort: next })} />
+          </span>
+          <span>
+            <SortHeading label="Price" column="price" sort={sort} onSort={(next: string) => change({ sort: next })} />
+          </span>
+          <span>
+            <SortHeading label="Stock" column="stock" sort={sort} onSort={(next: string) => change({ sort: next })} />
+          </span>
           <span />
         </div>
         {onPage.length === 0 ? (
