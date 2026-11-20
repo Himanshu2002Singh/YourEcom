@@ -4,10 +4,11 @@ import { ApiError, api } from '@/lib/api';
 import { describeCoupon, discountFor, formatPrice } from '@/lib/pricing';
 import type { Coupon } from '@/types/store';
 
-type CouponBoxProps = { subtotal: number; coupon: Coupon | null; setCoupon: (coupon: Coupon | null) => void };
+// subtotal: what the coupon would apply to (the retail items); note: a line under the heading.
+type CouponBoxProps = { subtotal: number; coupon: Coupon | null; setCoupon: (coupon: Coupon | null) => void; note?: string };
 
 // The checkout's coupon field and the offers this customer can still use. Sits on the dark order summary.
-export function CouponBox({ subtotal, coupon, setCoupon }: CouponBoxProps) {
+export function CouponBox({ subtotal, coupon, setCoupon, note }: CouponBoxProps) {
   const [offers, setOffers] = useState<Coupon[]>([]);
   const [code, setCode] = useState('');
   const [checking, setChecking] = useState(false);
@@ -52,6 +53,7 @@ export function CouponBox({ subtotal, coupon, setCoupon }: CouponBoxProps) {
       <p className="flex items-center gap-2 text-sm font-semibold">
         <TicketPercent size={17} className="text-emerald-300" /> Coupons and offers
       </p>
+      {note && <p className="mt-1 text-xs leading-5 text-blue-200">{note}</p>}
       {coupon ? (
         <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-dashed border-emerald-300/70 px-3 py-2.5">
           <div className="min-w-0" aria-live="polite">

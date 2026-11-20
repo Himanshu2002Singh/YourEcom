@@ -4,12 +4,12 @@ import { Heart, LoaderCircle, ShoppingCart, Star } from 'lucide-react';
 import { QuantityStepper } from '@/components/QuantityStepper';
 import { discountOf, groupName, variantLabel, type ProductGroup } from '@/lib/catalogue';
 import { formatPrice, perItemPrice } from '@/lib/pricing';
-import type { Product } from '@/types/store';
+import type { CartLine, Product } from '@/types/store';
 
 // What product cards and pages can do with the cart and the wishlist (App.tsx keeps both).
 export type ShopActions = {
-  quantityOf: (id: number) => number;
-  addToCart: (product: Product) => void;
+  lineOf: (id: number) => CartLine | undefined; // the product's line in the cart, if it is there
+  addToCart: (product: Product, options?: { quantity?: number; bulk?: boolean }) => void; // one pack retail unless told otherwise
   setQuantity: (id: number, quantity: number) => void;
   isSaved: (id: number) => boolean;
   toggleSaved: (product: Product) => void;
@@ -70,6 +70,11 @@ export function Price({ product, large, className = '' }: { product: Pick<Produc
   );
 }
 
+// Marks a line in a cart or an order as a bulk order (bulk price, GST added).
+export function BulkTag({ className = 'bg-brand-soft text-brand' }: { className?: string }) {
+  return <span className={`mr-1.5 inline-block rounded px-1.5 py-px align-[1px] text-[10px] font-bold uppercase tracking-wide ${className}`}>Bulk order</span>;
+}
+
 // The heart that saves a product to the wishlist, or takes it off again.
 export function SaveButton({ product, saved, toggleSaved }: { product: Product; saved: boolean; toggleSaved: (product: Product) => void }) {
   return (
@@ -85,14 +90,16 @@ export function SaveButton({ product, saved, toggleSaved }: { product: Product; 
   );
 }
 
-// The yellow "Add to cart" button, or the quantity stepper once the product is in the cart.
-export function AddToCart({ product, quantityOf, addToCart, setQuantity }: Pick<ShopActions, 'quantityOf' | 'addToCart' | 'setQuantity'> & { product: Product }) {
-  const quantity = quantityOf(product.id);
-  if (quantity > 0) {
+// The yellow "Add to cart" button, or the quantity stepper once the product is in the cart (as a bulk order, from
+// its smallest bulk order).
+export function AddToCart({ product, lineOf, addToCart, setQuantity }: Pick<ShopActions, 'lineOf' | 'addToCart' | 'setQuantity'> & { product: Product }) {
+  const line = lineOf(product.id);
+  if (line) {
+    const bulk = line.bulk ? product.bulk : null;
     return (
       <div className="flex items-center justify-between gap-2">
-        <QuantityStepper quantity={quantity} onChange={(next: number) => setQuantity(product.id, next)} label={product.name} max={product.stock} />
-        <span className="text-xs font-bold text-deal">In cart</span>
+        <QuantityStepper quantity={line.quantity} onChange={(next: number) => setQuantity(product.id, next)} label={product.name} max={product.stock} min={bulk?.minQuantity} />
+        <span className="text-xs font-bold text-deal">{bulk ? 'Bulk order' : 'In cart'}</span>
       </div>
     );
   }
@@ -132,6 +139,11 @@ export function ProductCard({ group, isSaved, toggleSaved, ...cart }: ShopAction
         {product.unit}
         {perItemPrice(product) && <span className="whitespace-nowrap"> · {perItemPrice(product)}</span>}
       </p>
+      {product.bulk && (
+        <p className="mt-0.5 text-xs font-medium text-brand">
+          Bulk {formatPrice(product.bulk.price)} + {product.bulk.gstRate}% GST
+        </p>
+      )}
       <StockNote stock={product.stock} className="mt-1" />
       {group.length > 1 && (
         <label className="mt-2 flex items-center gap-2 text-xs text-slate-500">

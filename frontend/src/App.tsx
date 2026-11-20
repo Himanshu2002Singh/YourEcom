@@ -9,6 +9,7 @@ import { usePersistentState } from '@/hooks/usePersistentState';
 import { useScrollRestoration } from '@/hooks/useScrollRestoration';
 import { ApiError, NO_API, api } from '@/lib/api';
 import { addToLines, setLineQuantity } from '@/lib/cart';
+import { cartTotals, priceLine } from '@/lib/pricing';
 import { AboutPage } from '@/pages/AboutPage';
 import { AdminDashboard } from '@/pages/admin/AdminDashboard';
 import { AdminOrderPage } from '@/pages/admin/AdminOrderPage';
@@ -113,31 +114,40 @@ function App() {
   // The cart stores ids only, so prices and images always come from the current catalogue.
   const cart = cartLines.flatMap((line: CartLine): CartItem[] => {
     const product = products?.find((item: Product) => item.id === line.id);
-    return product ? [{ ...product, quantity: line.quantity }] : [];
+    return product ? [priceLine(product, line.quantity, line.bulk)] : [];
   });
-  const cartCount = cart.reduce((total: number, item: CartItem) => total + item.quantity, 0);
-  const cartTotal = cart.reduce((total: number, item: CartItem) => total + item.price * item.quantity, 0);
+  const totals = cartTotals(cart);
 
   const openCart = (): void => {
     setNotice(null);
     setCartOpen(true);
   };
 
-  const quantityOf = (id: number): number => cartLines.find((line: CartLine) => line.id === id)?.quantity ?? 0;
+  const lineOf = (id: number): CartLine | undefined => cartLines.find((line: CartLine) => line.id === id);
+  const quantityOf = (id: number): number => lineOf(id)?.quantity ?? 0;
 
   const stockNotice = (product: Product): string => (product.stock === 0 ? `${product.name} is out of stock` : `Only ${product.stock} left of ${product.name}`);
 
-  const addToCart = (product: Product): void => {
-    if (quantityOf(product.id) >= product.stock) return notify(stockNotice(product), { error: true });
-    setCartLines((current: CartLine[]) => addToLines(current, product.id, 1));
-    notify(`${product.name} added to cart`, { action: { label: 'View cart', run: openCart } });
+  // One pack retail, or `quantity` packs as a bulk order. A product is in the cart once: adding it the other way
+  // changes its line over.
+  const addToCart = (product: Product, { quantity = 1, bulk = false }: { quantity?: number; bulk?: boolean } = {}): void => {
+    const line = lineOf(product.id);
+    const switching = line !== undefined && Boolean(line.bulk) !== bulk;
+    if ((line && !switching ? line.quantity : 0) + quantity > product.stock) return notify(stockNotice(product), { error: true });
+    setCartLines((current: CartLine[]) => addToLines(current, product.id, quantity, bulk));
+    notify(switching ? `${product.name} is now a ${bulk ? 'bulk' : 'retail'} order in your cart` : `${product.name} added to cart`, {
+      action: { label: 'View cart', run: openCart },
+    });
   };
 
-  // A quantity never goes above what's in stock; asking for more says how many are left.
+  // A quantity never goes above what's in stock; asking for more says how many are left. A bulk line stays at or
+  // above the product's smallest bulk order: its stepper removes it from there.
   const setQuantity = (id: number, quantity: number): void => {
     const product = products?.find((item: Product) => item.id === id);
-    if (product && quantity > product.stock && quantity > quantityOf(id)) notify(stockNotice(product), { error: true });
-    setCartLines((current: CartLine[]) => setLineQuantity(current, id, product ? Math.min(quantity, product.stock) : quantity));
+    const smallest = lineOf(id)?.bulk && product?.bulk ? product.bulk.minQuantity : 1;
+    const wanted = quantity === 0 ? 0 : Math.max(quantity, smallest);
+    if (product && wanted > product.stock && wanted > quantityOf(id)) notify(stockNotice(product), { error: true });
+    setCartLines((current: CartLine[]) => setLineQuantity(current, id, product ? Math.min(wanted, product.stock) : wanted));
   };
 
   const isSaved = (id: number): boolean => wishlist?.includes(id) ?? false;
@@ -159,19 +169,20 @@ function App() {
     });
   };
 
-  const shopActions = { quantityOf, addToCart, setQuantity, isSaved, toggleSaved };
+  const shopActions = { lineOf, addToCart, setQuantity, isSaved, toggleSaved };
 
+  // Each item goes back in the way it was bought, retail or bulk.
   const buyAgain = (order: Order): void => {
-    setCartLines((current: CartLine[]) => order.items.reduce((lines: CartLine[], item: OrderItem) => addToLines(lines, item.id, item.quantity), current));
+    setCartLines((current: CartLine[]) => order.items.reduce((lines: CartLine[], item: OrderItem) => addToLines(lines, item.id, item.quantity, item.bulk), current));
     openCart();
   };
 
-  // Sends the cart as ids and quantities only: the backend prices the order from its own catalogue.
+  // Sends the cart as ids, quantities and retail or bulk only: the backend prices the order from its own catalogue.
   const placeOrder = async (delivery: DeliveryDetails, paymentMethod: PaymentMethod, couponCode?: string): Promise<Order> => {
     try {
       const { order } = await api<{ order: Order }>('/orders', {
         method: 'POST',
-        body: { items: cart.map(({ id, quantity }: CartItem) => ({ id, quantity })), delivery, paymentMethod, couponCode },
+        body: { items: cart.map(({ product, quantity, bulk }: CartItem) => ({ id: product.id, quantity, bulk })), delivery, paymentMethod, couponCode },
       });
       setOrders((current: Order[] | null) => [order, ...(current ?? [])]);
       setCartLines([]);
@@ -311,7 +322,7 @@ function App() {
         <Route
           element={
             <>
-              <Header cartCount={cartCount} wishlistCount={wishlist?.length ?? 0} openCart={openCart} user={user ?? null} products={products} />
+              <Header cartCount={totals.count} wishlistCount={wishlist?.length ?? 0} openCart={openCart} user={user ?? null} products={products} />
               <Outlet />
               <Footer products={products} />
               <WhatsAppButton />
@@ -336,7 +347,7 @@ function App() {
               withProducts(() => (
                 <CheckoutPage
                   cart={cart}
-                  cartTotal={cartTotal}
+                  totals={totals}
                   user={currentUser}
                   savedDelivery={orders?.[0]?.delivery}
                   setQuantity={setQuantity}
@@ -394,8 +405,7 @@ function App() {
       <CartDrawer
         open={cartOpen}
         cart={cart}
-        cartCount={cartCount}
-        cartTotal={cartTotal}
+        totals={totals}
         setOpen={setCartOpen}
         setQuantity={setQuantity}
         checkout={() => {

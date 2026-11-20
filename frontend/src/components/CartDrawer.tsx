@@ -1,20 +1,20 @@
 import { useEffect, useRef, type MouseEvent } from 'react';
 import { ShoppingCart, Trash2, X } from 'lucide-react';
 import { QuantityStepper } from '@/components/QuantityStepper';
-import { FREE_DELIVERY_THRESHOLD, deliveryFeeFor, formatPrice } from '@/lib/pricing';
+import { BulkTag } from '@/components/StoreShared';
+import { FREE_DELIVERY_THRESHOLD, formatPrice, type CartTotals } from '@/lib/pricing';
 import type { CartItem } from '@/types/store';
 
 type CartDrawerProps = {
   open: boolean;
   cart: CartItem[];
-  cartCount: number;
-  cartTotal: number;
+  totals: CartTotals;
   setOpen: (open: boolean) => void;
   setQuantity: (id: number, quantity: number) => void;
   checkout: () => void;
 };
 
-export function CartDrawer({ open, cart, cartCount, cartTotal, setOpen, setQuantity, checkout }: CartDrawerProps) {
+export function CartDrawer({ open, cart, totals, setOpen, setQuantity, checkout }: CartDrawerProps) {
   const panel = useRef<HTMLElement>(null);
 
   // While open: Escape closes, Tab stays inside the drawer, the page behind stops scrolling without
@@ -49,8 +49,8 @@ export function CartDrawer({ open, cart, cartCount, cartTotal, setOpen, setQuant
   }, [open, setOpen]);
 
   if (!open) return null;
-  const deliveryFee = deliveryFeeFor(cartTotal);
-  const remainingForFreeDelivery = FREE_DELIVERY_THRESHOLD - cartTotal;
+  const { count, subtotal, retailSubtotal, gst, deliveryFee, total } = totals;
+  const remainingForFreeDelivery = FREE_DELIVERY_THRESHOLD - (subtotal + gst);
 
   return (
     <div className="fixed inset-0 z-40 bg-navy/30 backdrop-blur-sm" onClick={() => setOpen(false)}>
@@ -68,7 +68,7 @@ export function CartDrawer({ open, cart, cartCount, cartTotal, setOpen, setQuant
               Your cart
             </h2>
             <p className="mt-1 text-sm text-slate-400">
-              {cartCount} {cartCount === 1 ? 'item' : 'items'}
+              {count} {count === 1 ? 'item' : 'items'}
             </p>
           </div>
           <button autoFocus onClick={() => setOpen(false)} aria-label="Close cart" className="rounded-full bg-slate-100 p-2 text-slate-500 transition hover:bg-slate-200">
@@ -90,26 +90,39 @@ export function CartDrawer({ open, cart, cartCount, cartTotal, setOpen, setQuant
             </div>
           ) : (
             <div className="space-y-4">
-              {cart.map((item: CartItem) => (
-                <div key={item.id} className="flex gap-3 rounded-xl border border-slate-100 p-3">
-                  <img src={item.image} alt={item.name} className="h-16 w-16 shrink-0 rounded-xl object-cover sm:h-20 sm:w-20" />
+              {cart.map(({ product, quantity, bulk, price, gst: lineGst }: CartItem) => (
+                <div key={product.id} className="flex gap-3 rounded-xl border border-slate-100 p-3">
+                  <img src={product.image} alt={product.name} className="h-16 w-16 shrink-0 rounded-xl object-cover sm:h-20 sm:w-20" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="font-semibold leading-snug text-navy">{item.name}</p>
+                      <p className="font-semibold leading-snug text-navy">{product.name}</p>
                       <button
-                        onClick={() => setQuantity(item.id, 0)}
-                        aria-label={`Remove ${item.name} from cart`}
+                        onClick={() => setQuantity(product.id, 0)}
+                        aria-label={`Remove ${product.name} from cart`}
                         className="-mr-1 -mt-1 shrink-0 rounded-full p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-500"
                       >
                         <Trash2 size={15} />
                       </button>
                     </div>
                     <p className="mt-0.5 text-xs font-semibold text-slate-400">
-                      {formatPrice(item.price)} · {item.unit}
+                      {bulk && <BulkTag />}
+                      {formatPrice(price)}
+                      {bulk && ` + ${product.bulk?.gstRate}% GST`} · {product.unit}
                     </p>
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                      <QuantityStepper quantity={item.quantity} onChange={(next: number) => setQuantity(item.id, next)} label={item.name} max={item.stock} size="sm" tone="light" />
-                      <span className="ml-auto font-bold text-navy">{formatPrice(item.price * item.quantity)}</span>
+                      <QuantityStepper
+                        quantity={quantity}
+                        onChange={(next: number) => setQuantity(product.id, next)}
+                        label={product.name}
+                        max={product.stock}
+                        min={bulk ? product.bulk?.minQuantity : undefined}
+                        size="sm"
+                        tone="light"
+                      />
+                      <span className="ml-auto text-right font-bold text-navy">
+                        {formatPrice(price * quantity)}
+                        {bulk && <span className="block text-xs font-semibold text-slate-400">+ {formatPrice(lineGst)} GST</span>}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -125,21 +138,27 @@ export function CartDrawer({ open, cart, cartCount, cartTotal, setOpen, setQuant
             <div className="space-y-2 text-sm text-slate-500">
               <div className="flex justify-between">
                 <span>Subtotal</span>
-                <span>{formatPrice(cartTotal)}</span>
+                <span>{formatPrice(subtotal)}</span>
               </div>
+              {gst > 0 && (
+                <div className="flex justify-between">
+                  <span>GST on bulk orders</span>
+                  <span>{formatPrice(gst)}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span>Delivery</span>
                 {deliveryFee === 0 ? <span className="font-bold text-leaf">FREE</span> : <span>{formatPrice(deliveryFee)}</span>}
               </div>
               <div className="flex justify-between border-t border-slate-100 pt-3 text-base font-bold text-navy">
                 <span>Total</span>
-                <span>{formatPrice(cartTotal + deliveryFee)}</span>
+                <span>{formatPrice(total)}</span>
               </div>
             </div>
             <button onClick={checkout} className="mt-5 w-full rounded-full bg-buy py-3.5 font-bold text-slate-900 shadow-sm transition hover:bg-buy-dark">
               Continue to checkout
             </button>
-            <p className="mt-3 text-center text-xs font-semibold text-slate-400">Have a coupon? Apply it at checkout.</p>
+            {retailSubtotal > 0 && <p className="mt-3 text-center text-xs font-semibold text-slate-400">Have a coupon? Apply it at checkout.</p>}
           </div>
         )}
       </aside>

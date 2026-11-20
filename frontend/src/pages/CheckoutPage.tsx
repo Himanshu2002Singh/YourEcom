@@ -3,21 +3,23 @@ import { Link } from 'react-router';
 import { ArrowLeft, ArrowRight, Check, CreditCard, LockKeyhole, MapPin, PackageCheck, ShoppingCart, type LucideIcon } from 'lucide-react';
 import { CouponBox } from '@/components/CouponBox';
 import { QuantityStepper } from '@/components/QuantityStepper';
+import { BulkTag } from '@/components/StoreShared';
 import { TextField } from '@/components/TextField';
 import { usePageTitle } from '@/hooks/usePageTitle';
-import { FREE_DELIVERY_THRESHOLD, deliveryFeeFor, discountFor, formatPrice } from '@/lib/pricing';
+import { FREE_DELIVERY_THRESHOLD, discountFor, formatPrice, type CartTotals } from '@/lib/pricing';
 import type { CartItem, Coupon, DeliveryDetails, Order, PaymentMethod, User } from '@/types/store';
 
 type CheckoutPageProps = {
   cart: CartItem[];
-  cartTotal: number;
+  totals: CartTotals; // before any coupon
   user: User;
   savedDelivery?: DeliveryDetails;
   setQuantity: (id: number, quantity: number) => void;
   placeOrder: (delivery: DeliveryDetails, paymentMethod: PaymentMethod, couponCode?: string) => Promise<Order>;
 };
 
-type Totals = { discount: number; deliveryFee: number; total: number };
+// The cart's totals with the coupon's discount taken off.
+type Totals = CartTotals & { discount: number };
 
 type Field = keyof DeliveryDetails;
 
@@ -70,7 +72,7 @@ const steps = ['Delivery', 'Payment', 'Done'];
 
 const errorFor = (field: Field, value: string): string | undefined => deliveryFields.find((item) => item.field === field)?.validate(value.trim());
 
-export function CheckoutPage({ cart, cartTotal, user, savedDelivery, setQuantity, placeOrder }: CheckoutPageProps) {
+export function CheckoutPage({ cart, totals: cartTotals, user, savedDelivery, setQuantity, placeOrder }: CheckoutPageProps) {
   const [step, setStep] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('online');
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
@@ -85,10 +87,9 @@ export function CheckoutPage({ cart, cartTotal, user, savedDelivery, setQuantity
   // While an order is being placed the cart empties just before the confirmation arrives.
   if (cart.length === 0 && !placing) return <EmptyCheckout />;
 
-  // A coupon whose minimum order the cart no longer reaches takes nothing off and isn't sent.
-  const discount = coupon ? discountFor(coupon, cartTotal) : 0;
-  const deliveryFee = deliveryFeeFor(cartTotal);
-  const totals: Totals = { discount, deliveryFee, total: cartTotal - discount + deliveryFee };
+  // A coupon is for the retail items only. One whose minimum order they no longer reach takes nothing off and isn't sent.
+  const discount = coupon ? discountFor(coupon, cartTotals.retailSubtotal) : 0;
+  const totals: Totals = { ...cartTotals, discount, total: cartTotals.total - discount };
 
   const update = (event: ChangeEvent<HTMLInputElement>): void => {
     const field = event.target.name as Field;
@@ -224,7 +225,7 @@ export function CheckoutPage({ cart, cartTotal, user, savedDelivery, setQuantity
             </>
           )}
         </section>
-        <OrderSummary cart={cart} cartTotal={cartTotal} totals={totals} coupon={coupon} setCoupon={setCoupon} setQuantity={setQuantity} />
+        <OrderSummary cart={cart} totals={totals} coupon={coupon} setCoupon={setCoupon} setQuantity={setQuantity} />
       </div>
     </main>
   );
@@ -254,41 +255,64 @@ function CheckoutSteps({ step }: { step: number }) {
 
 type OrderSummaryProps = {
   cart: CartItem[];
-  cartTotal: number;
   totals: Totals;
   coupon: Coupon | null;
   setCoupon: (coupon: Coupon | null) => void;
   setQuantity: (id: number, quantity: number) => void;
 };
 
-function OrderSummary({ cart, cartTotal, totals: { discount, deliveryFee, total }, coupon, setCoupon, setQuantity }: OrderSummaryProps) {
+function OrderSummary({ cart, totals: { subtotal, retailSubtotal, gst, discount, deliveryFee, total }, coupon, setCoupon, setQuantity }: OrderSummaryProps) {
+  const hasBulk = cart.some((item: CartItem) => item.bulk);
   return (
     <aside className="h-fit rounded-xl bg-navy p-5 text-white shadow-xl sm:p-8">
       <p className="text-sm font-semibold uppercase tracking-wider text-blue-200">Order summary</p>
       <h2 className="mt-2 text-2xl font-semibold">Your essentials</h2>
       <div className="mt-6 space-y-4">
-        {cart.map((item: CartItem) => (
-          <div key={item.id} className="flex gap-3 border-b border-white/10 pb-4">
-            <img src={item.image} alt={item.name} className="h-16 w-16 shrink-0 rounded-xl object-cover" />
+        {cart.map(({ product, quantity, bulk, price, gst: lineGst }: CartItem) => (
+          <div key={product.id} className="flex gap-3 border-b border-white/10 pb-4">
+            <img src={product.image} alt={product.name} className="h-16 w-16 shrink-0 rounded-xl object-cover" />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold leading-snug">{item.name}</p>
+              <p className="text-sm font-semibold leading-snug">{product.name}</p>
               <p className="mt-0.5 text-xs text-blue-200">
-                {formatPrice(item.price)} · {item.unit}
+                {bulk && <BulkTag className="bg-white/15 text-white" />}
+                {formatPrice(price)}
+                {bulk && ` + ${product.bulk?.gstRate}% GST`} · {product.unit}
               </p>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <QuantityStepper quantity={item.quantity} onChange={(next: number) => setQuantity(item.id, next)} label={item.name} max={item.stock} size="sm" tone="dark" />
-                <span className="ml-auto text-sm font-bold">{formatPrice(item.price * item.quantity)}</span>
+                <QuantityStepper
+                  quantity={quantity}
+                  onChange={(next: number) => setQuantity(product.id, next)}
+                  label={product.name}
+                  max={product.stock}
+                  min={bulk ? product.bulk?.minQuantity : undefined}
+                  size="sm"
+                  tone="dark"
+                />
+                <span className="ml-auto text-right text-sm font-bold">
+                  {formatPrice(price * quantity)}
+                  {bulk && <span className="block text-xs font-semibold text-blue-200">+ {formatPrice(lineGst)} GST</span>}
+                </span>
               </div>
             </div>
           </div>
         ))}
       </div>
-      <CouponBox subtotal={cartTotal} coupon={coupon} setCoupon={setCoupon} />
+      {retailSubtotal > 0 ? (
+        <CouponBox subtotal={retailSubtotal} coupon={coupon} setCoupon={setCoupon} note={hasBulk ? 'Coupons are for retail items. Bulk orders already have the wholesale rate.' : undefined} />
+      ) : (
+        <p className="mt-6 rounded-xl bg-white/5 p-4 text-xs leading-5 text-blue-200">Coupons are for retail items. Bulk orders already have the wholesale rate.</p>
+      )}
       <div className="mt-6 space-y-3 text-sm text-blue-100">
         <div className="flex justify-between">
           <span>Subtotal</span>
-          <span>{formatPrice(cartTotal)}</span>
+          <span>{formatPrice(subtotal)}</span>
         </div>
+        {gst > 0 && (
+          <div className="flex justify-between">
+            <span>GST on bulk orders</span>
+            <span>{formatPrice(gst)}</span>
+          </div>
+        )}
         {discount > 0 && (
           <div className="flex justify-between font-bold text-emerald-300">
             <span>Coupon {coupon?.code}</span>
@@ -299,7 +323,7 @@ function OrderSummary({ cart, cartTotal, totals: { discount, deliveryFee, total 
           <span>Delivery</span>
           {deliveryFee === 0 ? <span className="font-bold text-emerald-300">FREE</span> : <span>{formatPrice(deliveryFee)}</span>}
         </div>
-        {deliveryFee > 0 && <p className="text-xs text-blue-200">Add {formatPrice(FREE_DELIVERY_THRESHOLD - cartTotal)} more for free delivery.</p>}
+        {deliveryFee > 0 && <p className="text-xs text-blue-200">Add {formatPrice(FREE_DELIVERY_THRESHOLD - subtotal - gst)} more for free delivery.</p>}
         <div className="mt-4 flex justify-between border-t border-white/15 pt-4 text-lg font-bold text-white">
           <span>Total</span>
           <span>{formatPrice(total)}</span>

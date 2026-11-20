@@ -7,6 +7,8 @@ type QuantityStepperProps = {
   onChange: (quantity: number) => void;
   label: string;
   max?: number; // what's in stock; never above MAX_QUANTITY
+  min?: number; // the fewest there can be, such as a bulk order's smallest
+  removable?: boolean; // whether going below `min` removes the item (a bin) or isn't possible
   size?: 'sm' | 'md' | 'lg';
   tone?: 'brand' | 'light' | 'dark';
 };
@@ -23,11 +25,13 @@ const tones = {
   dark: { box: 'bg-white/10 text-white', button: 'hover:bg-white/20' },
 };
 
-// − [qty] + control used wherever a cart quantity is shown. At 1 the minus becomes a bin that removes
-// the item, and the number can be typed for bulk orders (empty or 0 falls back to the current value).
-export function QuantityStepper({ quantity, onChange, label, max = MAX_QUANTITY, size = 'md', tone = 'brand' }: QuantityStepperProps) {
+// − [qty] + control used wherever a cart quantity is shown. At the minimum the minus becomes a bin that removes
+// the item (or stops, if it isn't removable), and the number can be typed for bulk orders: a number below the
+// minimum isn't taken, and leaving the box shows the current quantity again.
+export function QuantityStepper({ quantity, onChange, label, max = MAX_QUANTITY, min = 1, removable = true, size = 'md', tone = 'brand' }: QuantityStepperProps) {
   const [draft, setDraft] = useState<string | null>(null);
   const limit = Math.min(max, MAX_QUANTITY);
+  const atMinimum = quantity <= min;
   const { box, button, input, icon } = sizes[size];
   const colors = tones[tone];
   const buttonClass = `flex h-full ${button} shrink-0 items-center justify-center rounded-md transition ${colors.button} disabled:opacity-40 disabled:hover:bg-transparent`;
@@ -35,7 +39,7 @@ export function QuantityStepper({ quantity, onChange, label, max = MAX_QUANTITY,
   const type = (event: ChangeEvent<HTMLInputElement>): void => {
     const digits = event.target.value.replace(/\D/g, '').slice(0, String(MAX_QUANTITY).length);
     setDraft(digits);
-    if (Number(digits) >= 1) onChange(Number(digits));
+    if (Number(digits) >= min) onChange(Number(digits));
   };
 
   const blurOnEnter = (event: KeyboardEvent<HTMLInputElement>): void => {
@@ -46,11 +50,12 @@ export function QuantityStepper({ quantity, onChange, label, max = MAX_QUANTITY,
     <div className={`inline-flex shrink-0 items-center rounded-lg ${box} ${colors.box}`}>
       <button
         type="button"
-        onClick={() => onChange(quantity - 1)}
-        aria-label={quantity === 1 ? `Remove ${label} from cart` : `Decrease ${label} quantity`}
+        onClick={() => onChange(atMinimum ? 0 : quantity - 1)}
+        disabled={atMinimum && !removable}
+        aria-label={atMinimum && removable ? `Remove ${label} from cart` : `Decrease ${label} quantity`}
         className={buttonClass}
       >
-        {quantity === 1 ? <Trash2 size={icon} /> : <Minus size={icon} />}
+        {atMinimum && removable ? <Trash2 size={icon} /> : <Minus size={icon} />}
       </button>
       <input
         value={draft ?? quantity}

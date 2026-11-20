@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { BulkTag } from '@/components/StoreShared';
 import { formatPrice } from '@/lib/pricing';
 import type { Order, OrderItem, OrderStatus } from '@/types/store';
 
@@ -15,7 +16,7 @@ export function StatusPill({ status }: { status: OrderStatus }) {
   return <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[status]}`}>{status}</span>;
 }
 
-// The products as they were when the order was placed.
+// The products as they were when the order was placed. A bulk item shows its price before GST and the GST added.
 export function OrderItemList({ items }: { items: OrderItem[] }) {
   return (
     <ul className="divide-y divide-slate-100">
@@ -27,10 +28,15 @@ export function OrderItemList({ items }: { items: OrderItem[] }) {
             <div className="min-w-0">
               <h3 className="font-semibold leading-snug text-navy">{item.name}</h3>
               <p className="mt-1 text-sm font-semibold text-slate-400">
-                {item.quantity} × {formatPrice(item.price)} · {item.unit}
+                {item.bulk && <BulkTag />}
+                {item.quantity} × {formatPrice(item.price)}
+                {item.bulk && ` + ${item.gstRate}% GST`} · {item.unit}
               </p>
             </div>
-            <p className="shrink-0 font-bold text-navy">{formatPrice(item.price * item.quantity)}</p>
+            <p className="shrink-0 font-bold text-navy sm:text-right">
+              {formatPrice(item.price * item.quantity)}
+              {item.bulk && <span className="block text-xs font-semibold text-slate-400">+ {formatPrice(item.gst)} GST</span>}
+            </p>
           </div>
         </li>
       ))}

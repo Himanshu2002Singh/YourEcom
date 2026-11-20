@@ -28,10 +28,14 @@ export type Product = {
 
 export type Review = { name: string; rating: number; comment: string; createdAt: string; mine: boolean };
 
-export type CartLine = { id: number; quantity: number };
-export type CartItem = Product & { quantity: number };
-// What an order keeps of each product: a copy taken when the order was placed.
-export type OrderItem = Pick<Product, 'id' | 'name' | 'price' | 'unit' | 'image'> & { quantity: number };
+// What the browser keeps of the cart: each product once, retail unless `bulk` (a bulk order of it).
+export type CartLine = { id: number; quantity: number; bulk?: boolean };
+// A cart line with its product, priced as it would be ordered now (lib/pricing.ts priceLine): `price` a pack, which
+// on a bulk line is the bulk price before GST, and `gst`, the GST added to a bulk line (0 on retail ones).
+export type CartItem = { product: Product; quantity: number; bulk: boolean; price: number; gst: number };
+// What an order keeps of each product: a copy taken when the order was placed. On a bulk item `price` is before
+// GST, and `gst` is what its gstRate added.
+export type OrderItem = Pick<Product, 'id' | 'name' | 'price' | 'unit' | 'image'> & { quantity: number; bulk: boolean; gstRate: number | null; gst: number };
 
 export type User = {
   name: string;
@@ -62,11 +66,12 @@ export type Order = {
   email: string;
   placedAt: string;
   items: OrderItem[];
-  subtotal: number;
-  discount: number; // what couponCode took off the subtotal
+  subtotal: number; // the items at their prices: retail with GST, bulk before it
+  discount: number; // what couponCode took off the retail items
   couponCode: string | null;
+  gst: number; // the GST added to the bulk items
   deliveryFee: number;
-  total: number; // subtotal - discount + deliveryFee
+  total: number; // subtotal - discount + gst + deliveryFee
   delivery: DeliveryDetails;
   paymentMethod: PaymentMethod;
   status: OrderStatus;

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { Banknote, ChevronRight, MapPin, ShoppingCart, TriangleAlert, Truck, Zap } from 'lucide-react';
+import { Banknote, ChevronRight, MapPin, PackageCheck, ShoppingCart, TriangleAlert, Truck, Zap } from 'lucide-react';
 import { ProductReviews } from '@/components/ProductReviews';
 import { QuantityStepper } from '@/components/QuantityStepper';
 import { Price, ProductCard, RatingSummary, SaveButton, StockNote, WhatsAppIcon, panel, type ShopActions } from '@/components/StoreShared';
@@ -9,9 +9,9 @@ import { ADDRESS, PHONE, PHONE_LINK, whatsAppLink } from '@/data/contact';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { NO_API } from '@/lib/api';
 import { categoryPath, discountOf, groupByFamily, groupName, variantLabel, type ProductGroup } from '@/lib/catalogue';
-import { DELIVERY_FEE, FREE_DELIVERY_THRESHOLD, formatPrice, perItemPrice } from '@/lib/pricing';
+import { DELIVERY_FEE, FREE_DELIVERY_THRESHOLD, formatPrice, lineTotal, perItemPrice, priceLine } from '@/lib/pricing';
 import { NotFoundPage } from '@/pages/NotFoundPage';
-import type { Product, User } from '@/types/store';
+import type { CartItem, Product, User } from '@/types/store';
 
 type ProductPageProps = ShopActions & {
   products: Product[]; // the catalogue from the API
@@ -50,16 +50,52 @@ function Gallery({ images, name, badge }: { images: string[]; name: string; badg
   );
 }
 
+// A bulk order line as it adds up: the packs at the bulk price, the GST on them, and the two together.
+function BulkSum({ line }: { line: CartItem }) {
+  const rows: [string, number][] = [
+    [`${line.quantity} × ${formatPrice(line.price)}`, line.price * line.quantity],
+    [`GST ${line.product.bulk?.gstRate ?? 0}%`, line.gst],
+  ];
+  return (
+    <dl className="space-y-1 text-sm text-slate-600">
+      {rows.map(([label, amount]) => (
+        <div key={label} className="flex justify-between gap-3">
+          <dt>{label}</dt>
+          <dd>{formatPrice(amount)}</dd>
+        </div>
+      ))}
+      <div className="flex justify-between gap-3 border-t border-slate-200 pt-1 font-bold text-slate-900">
+        <dt>Total</dt>
+        <dd>{formatPrice(lineTotal(line))}</dd>
+      </div>
+    </dl>
+  );
+}
+
 export function ProductPage({ products, openCart, user, reloadProducts, ...shop }: ProductPageProps) {
-  const { quantityOf, addToCart, setQuantity, isSaved, toggleSaved } = shop;
+  const { lineOf, addToCart, setQuantity, isSaved, toggleSaved } = shop;
   const navigate = useNavigate();
   const { id } = useParams();
   const product = products.find((item: Product) => item.id === Number(id));
+  // Retail, unless the shopper switches to a bulk order (or already has one in the cart). The choice stays while
+  // they look at the product's other sizes.
+  const [wantsBulk, setWantsBulk] = useState(() => Boolean(product && lineOf(product.id)?.bulk));
+  // How many packs of a bulk order are being chosen, before it goes in the cart; for one product only.
+  const [bulkDraft, setBulkDraft] = useState<{ id: number; quantity: number } | null>(null);
   usePageTitle(product?.name ?? 'Page not found');
 
   if (!product) return <NotFoundPage />;
-  const quantity = quantityOf(product.id);
+  const terms = product.bulk;
+  const bulk = wantsBulk && terms !== null;
+  const line = lineOf(product.id);
+  // How many are in the cart the way the shopper is buying now. A line bought the other way is switched over when
+  // they add this way.
+  const quantity = line && Boolean(line.bulk) === bulk ? line.quantity : 0;
+  const otherWay = line && quantity === 0 ? line : undefined;
   const soldOut = product.stock === 0;
+  const bulkTooBig = terms !== null && product.stock < terms.minQuantity;
+  const cantAdd = quantity === 0 && (bulk ? bulkTooBig : soldOut);
+  const bulkQuantity = bulkDraft?.id === product.id ? bulkDraft.quantity : (terms?.minQuantity ?? 1);
   const sizes = product.family ? groupByFamily(products.filter((item: Product) => item.family === product.family))[0] : [product];
   const perItem = perItemPrice(product);
   // The rest of the category first, otherwise anything else; never this product's own sizes.
@@ -68,25 +104,45 @@ export function ProductPage({ products, openCart, user, reloadProducts, ...shop 
   const related = groupByFamily(sameCategory.length > 0 ? sameCategory : others).slice(0, 5);
   const bulkMessage = `Hello YourEcom, please share your bulk rate for ${product.name} (${product.unit}). Quantity I need: `;
 
+  const add = (): void => addToCart(product, bulk ? { quantity: bulkQuantity, bulk: true } : {});
+
   const buyNow = (): void => {
-    if (quantity === 0) addToCart(product);
+    if (quantity === 0) add();
     navigate('/checkout');
   };
 
-  // Add to cart and Buy now: under the photos on wide screens, under the price and sizes on phones.
+  // Add to cart and Buy now: under the photos on wide screens, under the price and sizes on phones. A bulk order
+  // first picks its number of packs and shows what they come to with GST.
   const buyButtons = (className: string) => (
     <div className={className}>
+      {bulk && terms && quantity === 0 && !bulkTooBig && (
+        <div className="mb-3 space-y-3 rounded-md border border-brand/20 bg-brand-soft/60 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-sm font-medium text-slate-700">Packs ({product.unit})</span>
+            <QuantityStepper
+              quantity={bulkQuantity}
+              onChange={(next: number) => setBulkDraft({ id: product.id, quantity: Math.min(next, product.stock) })}
+              label={product.name}
+              max={product.stock}
+              min={terms.minQuantity}
+              removable={false}
+              tone="light"
+            />
+          </div>
+          <BulkSum line={priceLine(product, bulkQuantity, true)} />
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <button
-          onClick={quantity === 0 ? () => addToCart(product) : openCart}
-          disabled={soldOut && quantity === 0}
+          onClick={quantity === 0 ? add : openCart}
+          disabled={cantAdd}
           className="flex h-12 items-center justify-center gap-2 rounded-full bg-cart font-bold text-slate-900 shadow-sm transition hover:bg-cart-dark disabled:bg-slate-200 disabled:text-slate-500"
         >
-          <ShoppingCart size={18} /> {quantity === 0 ? 'Add to cart' : 'Go to cart'}
+          <ShoppingCart size={18} /> {quantity > 0 ? 'Go to cart' : bulk ? 'Add bulk order' : 'Add to cart'}
         </button>
         <button
           onClick={buyNow}
-          disabled={soldOut && quantity === 0}
+          disabled={cantAdd}
           className="flex h-12 items-center justify-center gap-2 rounded-full bg-buy font-bold text-slate-900 shadow-sm transition hover:bg-buy-dark disabled:bg-slate-200 disabled:text-slate-500"
         >
           <Zap size={18} /> Buy now
@@ -94,11 +150,19 @@ export function ProductPage({ products, openCart, user, reloadProducts, ...shop 
       </div>
       {quantity > 0 && (
         <div className="mt-3 flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
-          <QuantityStepper quantity={quantity} onChange={(next: number) => setQuantity(product.id, next)} label={product.name} max={product.stock} />
-          <p className="text-sm text-slate-600">
-            In your cart: <strong className="text-slate-900">{formatPrice(product.price * quantity)}</strong>
+          <QuantityStepper quantity={quantity} onChange={(next: number) => setQuantity(product.id, next)} label={product.name} max={product.stock} min={bulk ? terms?.minQuantity : 1} />
+          <p className="text-right text-sm text-slate-600">
+            {bulk ? 'Bulk order in cart' : 'In your cart'}:{' '}
+            <strong className="text-slate-900">{formatPrice(lineTotal(priceLine(product, quantity, bulk)))}</strong>
+            {bulk && <span className="block text-xs">GST included</span>}
           </p>
         </div>
+      )}
+      {otherWay && (
+        <p className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">
+          Your cart has {otherWay.quantity} {otherWay.bulk ? 'as a bulk order' : 'at the retail price'}. Adding {bulk ? 'a bulk order' : 'retail packs'} replaces{' '}
+          {otherWay.quantity === 1 ? 'it' : 'them'}.
+        </p>
       )}
     </div>
   );
@@ -110,6 +174,13 @@ export function ProductPage({ products, openCart, user, reloadProducts, ...shop 
     ...product.specs,
     ['Sold by', 'YourEcom, New Delhi'],
   ];
+
+  const ways: [boolean, string, string][] = terms
+    ? [
+        [false, 'Retail', 'Any number of packs, GST included'],
+        [true, 'Bulk order', `From ${terms.minQuantity} packs, plus ${terms.gstRate}% GST`],
+      ]
+    : [];
 
   return (
     <main className="mx-auto max-w-[1400px] px-2 py-3 sm:px-4">
@@ -143,15 +214,60 @@ export function ProductPage({ products, openCart, user, reloadProducts, ...shop 
           <a href="#reviews" className="mt-2 inline-block">
             <RatingSummary product={product} className="text-sm" />
           </a>
-          <div className="mt-4">
-            {discountOf(product) > 0 && <p className="text-sm font-bold text-deal">Special price</p>}
-            <Price product={product} large />
-            <p className="mt-1 text-sm text-slate-500">
-              {product.unit}
-              {perItem && ` (${perItem})`} · Inclusive of all taxes
-            </p>
-            <StockNote stock={product.stock} className="mt-2 text-sm" />
-          </div>
+
+          {/* Retail is the default; a product with bulk terms can be switched to a bulk order. */}
+          {ways.length > 0 && (
+            <div role="group" aria-label="Buy retail or in bulk" className="mt-4 grid max-w-md grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
+              {ways.map(([way, title, note]) => (
+                <button
+                  key={title}
+                  type="button"
+                  aria-pressed={bulk === way}
+                  onClick={() => setWantsBulk(way)}
+                  className={`rounded-md px-3 py-2 text-left transition ${bulk === way ? 'bg-white shadow-sm ring-1 ring-brand/30' : 'hover:bg-white/60'}`}
+                >
+                  <span className={`flex items-center gap-1.5 text-sm font-bold ${bulk === way ? 'text-brand' : 'text-slate-700'}`}>
+                    {way && <PackageCheck size={15} />} {title}
+                  </span>
+                  <span className="mt-0.5 block text-xs leading-snug text-slate-500">{note}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {bulk && terms ? (
+            <div className="mt-4">
+              <p className="text-sm font-bold text-brand">Bulk price</p>
+              <p className="flex flex-wrap items-baseline gap-x-2">
+                <span className="text-3xl font-bold text-slate-900">{formatPrice(terms.price)}</span>
+                <span className="text-base font-medium text-slate-600">+ {terms.gstRate}% GST</span>
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                {product.unit}
+                {perItemPrice({ price: terms.price, unit: product.unit }) && ` (${perItemPrice({ price: terms.price, unit: product.unit })} before GST)`}
+              </p>
+              <p className="mt-1 text-sm text-slate-700">
+                Smallest bulk order: <strong className="text-slate-900">{terms.minQuantity} packs</strong>
+              </p>
+              {bulkTooBig ? (
+                <p className="mt-2 text-sm font-bold text-amber-700">
+                  {soldOut ? 'Out of stock' : `Only ${product.stock} in stock`}, fewer than a bulk order. Call us on {PHONE} for a bulk supply.
+                </p>
+              ) : (
+                <StockNote stock={product.stock} className="mt-2 text-sm" />
+              )}
+            </div>
+          ) : (
+            <div className="mt-4">
+              {discountOf(product) > 0 && <p className="text-sm font-bold text-deal">Special price</p>}
+              <Price product={product} large />
+              <p className="mt-1 text-sm text-slate-500">
+                {product.unit}
+                {perItem && ` (${perItem})`} · Inclusive of all taxes
+              </p>
+              <StockNote stock={product.stock} className="mt-2 text-sm" />
+            </div>
+          )}
 
           {product.category === NON_MEDICAL_CATEGORY && (
             <p className="mt-4 flex gap-2.5 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
@@ -204,15 +320,29 @@ export function ProductPage({ products, openCart, user, reloadProducts, ...shop 
                 <strong className="text-slate-900">Cash on delivery</strong>, or pay online by card or UPI.
               </span>
             </li>
-            <li className="flex gap-3">
-              <WhatsAppIcon size={18} className="text-whatsapp" />
-              <span>
-                <strong className="text-slate-900">Buying in bulk?</strong>{' '}
-                <a href={whatsAppLink(bulkMessage)} target="_blank" rel="noreferrer" className="font-medium text-brand hover:underline">
-                  Ask for a bulk rate on WhatsApp
-                </a>
-              </span>
-            </li>
+            {terms ? (
+              <li className="flex gap-3">
+                <PackageCheck size={18} className="shrink-0 text-brand" />
+                <span>
+                  <strong className="text-slate-900">Bulk rate</strong> {formatPrice(terms.price)} + {terms.gstRate}% GST a pack, from {terms.minQuantity} packs.{' '}
+                  {!bulk && (
+                    <button type="button" onClick={() => setWantsBulk(true)} className="font-medium text-brand hover:underline">
+                      Order in bulk
+                    </button>
+                  )}
+                </span>
+              </li>
+            ) : (
+              <li className="flex gap-3">
+                <WhatsAppIcon size={18} className="text-whatsapp" />
+                <span>
+                  <strong className="text-slate-900">Buying in bulk?</strong>{' '}
+                  <a href={whatsAppLink(bulkMessage)} target="_blank" rel="noreferrer" className="font-medium text-brand hover:underline">
+                    Ask for a bulk rate on WhatsApp
+                  </a>
+                </span>
+              </li>
+            )}
           </ul>
 
           <section className="mt-6">
