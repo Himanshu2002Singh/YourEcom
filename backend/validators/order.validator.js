@@ -63,6 +63,15 @@ export function cleanOrder(body) {
   return order;
 }
 
+// POST /api/orders/:id/payment: what Razorpay Checkout hands back after a payment, its payment ID and signature.
+export function cleanPayment(body) {
+  const { razorpayPaymentId, razorpaySignature } = body ?? {};
+  if (typeof razorpayPaymentId !== 'string' || !/^pay_\w{6,40}$/.test(razorpayPaymentId) || typeof razorpaySignature !== 'string' || !/^[a-f0-9]{64}$/.test(razorpaySignature)) {
+    throw new HttpError(400, 'Send the payment ID and signature Razorpay gave.');
+  }
+  return { paymentId: razorpayPaymentId, signature: razorpaySignature };
+}
+
 // The optional ?status= filter of GET /api/orders and GET /api/admin/orders.
 export function cleanStatus(status = '') {
   if (status && !STATUSES.includes(status)) throw new HttpError(400, `Status must be ${STATUSES.slice(0, -1).join(', ')} or ${STATUSES.at(-1)}.`);

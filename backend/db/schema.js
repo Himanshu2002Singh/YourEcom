@@ -466,10 +466,14 @@ CREATE TABLE IF NOT EXISTS orders (
   total          INT                            NOT NULL,   -- subtotal - discount + gst + delivery_fee
   delivery       JSON                           NOT NULL,   -- { name, phone, address, city, pincode }
   payment_method ENUM('online', 'cod')          NOT NULL,
+  razorpay_order_id   VARCHAR(40)               NULL,       -- paid online: the Razorpay order that collects the payment
+  razorpay_payment_id VARCHAR(40)               NULL,       -- and the Razorpay payment, once it has the money
+  paid_at        TIMESTAMP(6)                   NULL,       -- when an order paid online was paid; NULL until then, and for cash on delivery
   status         ENUM('Processing', 'Shipped', 'Delivered', 'Cancelled') NOT NULL DEFAULT 'Processing',
   tracking       VARCHAR(200)                   NULL,       -- courier and tracking number, from the admin pages when it ships
   placed_at      TIMESTAMP(6)                   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),   -- microseconds keep "newest first" exact
   INDEX orders_by_user (user_id, placed_at),
+  UNIQUE KEY orders_by_razorpay_order (razorpay_order_id),
   CONSTRAINT orders_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
@@ -490,6 +494,15 @@ SET @add_gst := IF(
 PREPARE add_gst FROM @add_gst;
 EXECUTE add_gst;
 DEALLOCATE PREPARE add_gst;
+
+-- And databases made before online payments get the Razorpay columns here.
+SET @add_razorpay := IF(
+  (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'orders' AND column_name = 'razorpay_order_id') = 0,
+  'ALTER TABLE orders ADD COLUMN razorpay_order_id VARCHAR(40) NULL AFTER payment_method, ADD COLUMN razorpay_payment_id VARCHAR(40) NULL AFTER razorpay_order_id, ADD COLUMN paid_at TIMESTAMP(6) NULL AFTER razorpay_payment_id, ADD UNIQUE KEY orders_by_razorpay_order (razorpay_order_id)',
+  'DO 0');
+PREPARE add_razorpay FROM @add_razorpay;
+EXECUTE add_razorpay;
+DEALLOCATE PREPARE add_razorpay;
 
 -- Discount codes for the checkout. Each customer can use a code once; a cancelled order gives
 -- it back. To retire a code, set active to FALSE (orders keep their own copy of the code).

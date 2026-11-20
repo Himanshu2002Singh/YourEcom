@@ -85,6 +85,33 @@ export async function cancelForUser(userId, id) {
   return findForUser(userId, id);
 }
 
+// Takes back an order whose online payment couldn't even be started: its items go back in stock and the order is
+// deleted, as if it had never been placed.
+export async function discard(id) {
+  await transaction(async connection => {
+    const [[order]] = await connection.execute('SELECT items FROM orders WHERE id = ? FOR UPDATE', [id]);
+    if (!order) return;
+    for (const { id: productId, quantity } of order.items) await connection.execute('UPDATE products SET stock = stock + ? WHERE id = ?', [quantity, productId]);
+    await connection.execute('DELETE FROM orders WHERE id = ?', [id]);
+  });
+}
+
+// Keeps the Razorpay order that collects an order's payment, unless it already has one. Answers the one it keeps.
+export async function setRazorpayOrder(id, razorpayOrderId) {
+  await query('UPDATE orders SET razorpay_order_id = ? WHERE id = ? AND razorpay_order_id IS NULL', [razorpayOrderId, id]);
+  return (await query('SELECT razorpay_order_id FROM orders WHERE id = ?', [id]))[0]?.razorpay_order_id ?? razorpayOrderId;
+}
+
+// The order a Razorpay order collects the payment for, or null.
+export async function findByRazorpayOrder(razorpayOrderId) {
+  return (await query('SELECT * FROM orders WHERE razorpay_order_id = ?', [razorpayOrderId]))[0] ?? null;
+}
+
+// Records an online order's payment (a Razorpay payment ID), once.
+export async function markPaid(id, paymentId) {
+  await query('UPDATE orders SET paid_at = CURRENT_TIMESTAMP(6), razorpay_payment_id = ? WHERE id = ? AND paid_at IS NULL', [paymentId, id]);
+}
+
 // One of the customer's orders, or null (also when it is someone else's).
 export async function findForUser(userId, id) {
   return (await query('SELECT * FROM orders WHERE id = ? AND user_id = ?', [id, userId]))[0] ?? null;
@@ -133,9 +160,13 @@ export async function countByStatus() {
   return Object.fromEntries(STATUSES.map(status => [status, Number(rows.find(row => row.status === status)?.count ?? 0)]));
 }
 
-// The orders placed since `since` (a Date) that weren't cancelled: { orders, sales }, sales being their totals.
+// The orders placed since `since` (a Date) that weren't cancelled, leaving out those paid online whose payment
+// hasn't come in: { orders, sales }, sales being their totals.
 export async function salesSince(since) {
-  const [{ orders, sales }] = await query("SELECT COUNT(*) AS orders, COALESCE(SUM(total), 0) AS sales FROM orders WHERE placed_at >= ? AND status <> 'Cancelled'", [since]);
+  const [{ orders, sales }] = await query(
+    "SELECT COUNT(*) AS orders, COALESCE(SUM(total), 0) AS sales FROM orders WHERE placed_at >= ? AND status <> 'Cancelled' AND (payment_method = 'cod' OR paid_at IS NOT NULL)",
+    [since],
+  );
   return { orders: Number(orders), sales: Number(sales) };
 }
 

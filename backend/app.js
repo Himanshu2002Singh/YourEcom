@@ -8,7 +8,8 @@ import { UPLOAD_DIR, UPLOAD_URL } from './utils/uploads.js';
 const app = express();
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
-app.use(express.json());
+// Each JSON body's exact bytes are kept too: a Razorpay webhook's signature covers them (services/payment.service.js).
+app.use(express.json({ verify: (request, response, body) => { request.rawBody = body; } }));
 
 // Photos uploaded from the admin pages (utils/uploads.js). A name is never reused, so browsers may keep them.
 app.use(UPLOAD_URL, express.static(UPLOAD_DIR, { index: false, immutable: true, maxAge: '365d', setHeaders: response => response.set('X-Content-Type-Options', 'nosniff') }));

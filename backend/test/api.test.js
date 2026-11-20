@@ -1,11 +1,13 @@
 // HTTP tests against the real Express app. The "with database" suite runs only when
 // DATABASE_URL is set (backend/.env) and uses throwaway accounts it deletes afterwards.
 import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import app from '../app.js';
 import { closeDb, query } from '../db/pool.js';
+import { ensureAdminAccount } from '../services/adminAccount.service.js';
 import { DELIVERY_FEE, FREE_DELIVERY_THRESHOLD } from '../services/pricing.service.js';
 import { UPLOAD_DIR } from '../utils/uploads.js';
 import * as User from '../models/user.model.js';
@@ -143,7 +145,7 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
     const { store } = body;
     assert.deepEqual(Object.keys(store).sort(), [
       'aboutText', 'address', 'categories', 'email', 'governmentBuyers', 'gstin', 'indiamartLink', 'nonMedicalCategory',
-      'phone', 'phoneLink', 'policies', 'policiesUpdated', 'stockPhotos', 'supplyTypes', 'whatsappNumber',
+      'onlinePayment', 'phone', 'phoneLink', 'policies', 'policiesUpdated', 'stockPhotos', 'supplyTypes', 'whatsappNumber',
     ]);
     assert.deepEqual([store.phone, store.phoneLink, store.whatsappNumber], ['+91 70005 90408', 'tel:+917000590408', '917000590408']);
     assert.deepEqual(store.address, ['26-27, Block R3-B, Mohan Garden', 'Uttam Nagar, New Delhi 110059']);
@@ -188,7 +190,8 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
     assert.equal('badge' in products[3], false, 'a product without a badge has no badge key');
     assert.deepEqual([products[2].family, products[2].variant], ['Disposable Syringe without Needle', '2 ml'], 'a size names its family and variant');
 
-    const ids = async path => (await call(path)).body.products.map(product => product.id);
+    // Only the seeded products (ids up to 71) are compared: products an admin added to this database are left out.
+    const ids = async path => (await call(path)).body.products.map(product => product.id).filter(id => id <= 71);
     assert.deepEqual(await ids('/products?category=Gloves'), [2, 25, 26, 54, 68]);
     assert.deepEqual(await ids(`/products?category=${encodeURIComponent('Bandages & Gauze')}`), [5, 6, 39, 40, 41, 42, 43, 44, 45, 67, 69]);
     assert.deepEqual(await ids(`/products?category=${encodeURIComponent('IV Cannula')}`), [17, 18, 19, 20, 21, 36, 37]);
@@ -298,6 +301,7 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
       total: 998,
       delivery,
       paymentMethod: 'cod',
+      paymentStatus: 'cod',
       status: 'Processing',
       tracking: null,
     });
@@ -305,17 +309,18 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
   });
 
   test('delivery is free from ₹2,500', async () => {
-    const result = await call('/orders', { method: 'POST', cookie, body: { items: [{ id: 4, quantity: 2 }, { id: 6, quantity: 4 }], delivery, paymentMethod: 'online' } });
+    const result = await call('/orders', { method: 'POST', cookie, body: { items: [{ id: 4, quantity: 2 }, { id: 6, quantity: 4 }], delivery, paymentMethod: 'cod' } });
     const { subtotal, deliveryFee, total } = result.body.order;
     assert.deepEqual({ subtotal, deliveryFee, total }, { subtotal: 2514, deliveryFee: 0, total: 2514 }, '2 × ₹899 + 4 × ₹179');
   });
 
   test('order input is checked like the checkout form', async () => {
-    const valid = { items: [{ id: 1, quantity: 2 }], delivery, paymentMethod: 'online' };
+    const valid = { items: [{ id: 1, quantity: 2 }], delivery, paymentMethod: 'cod' };
     const invalid = [
       { ...valid, items: [] },
       { ...valid, items: [{ id: 1, quantity: 0 }] },
       { ...valid, items: [{ id: 1, quantity: 1000 }] },
+      { ...valid, items: [{ id: 1, quantity: 1_000_001, bulk: true }] },
       { ...valid, items: [{ id: 1, quantity: 1 }, { id: 1, quantity: 1 }] },
       { ...valid, items: [{ id: 999, quantity: 1 }] },
       { ...valid, delivery: { ...delivery, phone: '12345 67890' } },
@@ -394,7 +399,7 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
     const byPhone = await list('?q=091234 56780');
     assert.deepEqual(byPhone.orders.map(order => order.id), [cancelled.id, shipped.id], 'by phone however it’s typed, newest first');
     assert.deepEqual([byPhone.total, byPhone.page, byPhone.pageSize], [2, 1, 20]);
-    assert.deepEqual(byPhone.orders[1], { ...shipped, customerName: 'Admin Test Buyer' });
+    assert.deepEqual(byPhone.orders[1], { ...shipped, customerName: 'Admin Test Buyer', paymentId: null });
     assert.deepEqual(await ids('?q=admin%20test%20BUYER&status=Processing'), [shipped.id, cancelled.id], 'the queue to ship is oldest first');
     assert.deepEqual(await ids('?q=9123456780&page=2'), []);
     for (const filter of ['?status=Lost', '?page=0', '?page=x']) assert.equal((await call(`/admin/orders${filter}`, { cookie })).status, 400, filter);
@@ -471,7 +476,7 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
       const terms = { price: 700, minQuantity: 5, gstRate: 12 };
       assert.deepEqual((await save(terms)).body.product.bulk, terms);
       assert.deepEqual((await call('/products/4')).body.product.bulk, terms, 'the store shows them at once');
-      for (const bulk of [{ ...terms, gstRate: 41 }, { ...terms, minQuantity: 0 }, { ...terms, minQuantity: 1000 }, { ...terms, price: '700' }, { ...terms, price: 2300 }, undefined, [terms]]) {
+      for (const bulk of [{ ...terms, gstRate: 41 }, { ...terms, minQuantity: 0 }, { ...terms, minQuantity: 1_000_001 }, { ...terms, price: '700' }, { ...terms, price: 2300 }, undefined, [terms]]) {
         assert.equal((await save(bulk)).status, 400, `${JSON.stringify(bulk)} (₹2,300 + 12% is above the ₹2,500 MRP)`);
       }
 
@@ -488,6 +493,13 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
 
       assert.deepEqual((await order([{ id: 4, quantity: 5, bulk: true }], 'SAVE100')).body, { error: 'SAVE100 is for retail items. Bulk orders already have the wholesale rate.' });
       assert.deepEqual((await order([{ id: 4, quantity: 5, bulk: true }, { id: 6, quantity: 1 }], 'SAVE100')).body, { error: 'SAVE100 is for orders of ₹1,000 or more in retail items.' });
+
+      // A bulk order has no 999-pack ceiling: only the stock limits it, and so can the smallest bulk order.
+      assert.equal((await call('/admin/products/4', { method: 'PUT', cookie, body: { ...formFor(before), stock: 5000, bulk: { ...terms, minQuantity: 1200 } } })).status, 200);
+      assert.deepEqual((await order([{ id: 4, quantity: 5001, bulk: true }])).body, { error: 'Only 5000 left of IV Infusion Set. Lower the quantity and try again.' });
+      const large = await order([{ id: 4, quantity: 1500, bulk: true }]);
+      assert.equal(large.status, 201);
+      assert.deepEqual([large.body.order.items[0].quantity, large.body.order.total], [1500, 1500 * 700 + 1500 * 84], '1,500 × ₹700, and 12% GST');
     } finally {
       await query('UPDATE products SET bulk_price = ?, bulk_min_qty = ?, gst_rate = ? WHERE id = 4', [original.bulk_price, original.bulk_min_qty, original.gst_rate]);
     }
@@ -598,6 +610,176 @@ describe('with database', { skip: !process.env.DATABASE_URL && 'DATABASE_URL not
     } finally {
       await query('DELETE FROM coupons WHERE code IN (?, ?)', [expired, retired]);
     }
+  });
+
+  test('the admin account from ADMIN_EMAIL is made once, and never takes over an account that already exists', async () => {
+    const ownerEmail = `test-${stamp}-owner@example.com`;
+    assert.equal(await ensureAdminAccount({}), null, 'nothing set, nothing done');
+    await assert.rejects(ensureAdminAccount({ ADMIN_EMAIL: ownerEmail }), /ADMIN_PASSWORD/, 'half filled in');
+    await assert.rejects(ensureAdminAccount({ ADMIN_EMAIL: 'not-an-email', ADMIN_PASSWORD: 'owner-password' }), /ADMIN_EMAIL/);
+    assert.equal(await ensureAdminAccount({ ADMIN_EMAIL: ` ${ownerEmail.toUpperCase()} `, ADMIN_PASSWORD: 'owner-password' }), `Created the admin account ${ownerEmail} from ADMIN_EMAIL.`);
+    const owner = await call('/auth/login', { method: 'POST', body: { email: ownerEmail, password: 'owner-password' } });
+    assert.equal(owner.body.user.isAdmin, true);
+    assert.equal((await call('/admin/summary', { cookie: owner.cookie })).status, 200);
+    assert.equal(await ensureAdminAccount({ ADMIN_EMAIL: ownerEmail, ADMIN_PASSWORD: 'changed-password' }), null, 'made once');
+    assert.equal((await call('/auth/login', { method: 'POST', body: { email: ownerEmail, password: 'owner-password' } })).status, 200, 'its password isn’t reset');
+
+    const earlyBird = `test-${stamp}-early@example.com`;
+    await call('/auth/register', { method: 'POST', body: { name: 'Early Bird', email: earlyBird, password: 'early-password' } });
+    assert.match(await ensureAdminAccount({ ADMIN_EMAIL: earlyBird, ADMIN_PASSWORD: 'owner-password' }), /left as it is/);
+    assert.equal(Boolean((await User.findByEmail(earlyBird)).is_admin), false, 'someone who signed up with the address first isn’t made an admin');
+  });
+
+  // A stand-in for Razorpay's API (utils/razorpay.js calls it with fetch), keeping the calls made to it. Payments
+  // are added to `payments` by the test; every other request, such as the tests' own calls to the store, goes out
+  // as usual.
+  let razorpayOrders = 0;
+  function fakeRazorpay() {
+    const realFetch = globalThis.fetch;
+    const fake = { calls: [], payments: new Map(), failing: false, restore: () => { globalThis.fetch = realFetch; } };
+    const reply = (status, data) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
+    globalThis.fetch = async (url, init = {}) => {
+      const path = String(url).replace(/^https:\/\/api\.razorpay\.com\/v1/, '');
+      if (path === String(url)) return realFetch(url, init);
+      const body = init.body ? JSON.parse(init.body) : undefined;
+      fake.calls.push({ method: init.method, path, body, auth: init.headers?.Authorization });
+      if (fake.failing) return reply(401, { error: { code: 'BAD_REQUEST_ERROR', description: 'Authentication failed' } });
+      if (path === '/orders') return reply(200, { id: `order_Fake${stamp}n${(razorpayOrders += 1)}`, entity: 'order', amount: body.amount, currency: body.currency, receipt: body.receipt, status: 'created' });
+      const [, id, capture] = path.match(/^\/payments\/(\w+)(\/capture)?$/) ?? [];
+      const payment = fake.payments.get(id);
+      if (!payment) return reply(400, { error: { code: 'BAD_REQUEST_ERROR', description: 'The id provided does not exist' } });
+      if (capture) payment.status = 'captured';
+      return reply(200, payment);
+    };
+    return fake;
+  }
+
+  const razorpayKeys = { RAZORPAY_KEY_ID: 'rzp_test_FakeKey', RAZORPAY_KEY_SECRET: 'fake-key-secret', RAZORPAY_WEBHOOK_SECRET: 'fake-webhook-secret' };
+  const sign = (secret, text) => createHmac('sha256', secret).update(text).digest('hex');
+
+  // Runs work(fake) with only `keys` of the Razorpay settings set and the fake Razorpay answering; both are put
+  // back afterwards.
+  async function withRazorpay(keys, work) {
+    const saved = Object.fromEntries(Object.keys(razorpayKeys).map(name => [name, process.env[name]]));
+    const fake = fakeRazorpay();
+    try {
+      for (const name of Object.keys(razorpayKeys)) delete process.env[name];
+      Object.assign(process.env, keys);
+      await work(fake);
+    } finally {
+      fake.restore();
+      for (const [name, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
+  }
+
+  const payerEmail = `test-${stamp}-payer@example.com`;
+  let payer; // a customer of its own, who pays online
+  const placeOnline = (items = [{ id: 6, quantity: 2 }]) => call('/orders', { method: 'POST', cookie: payer, body: { items, delivery, paymentMethod: 'online' } });
+
+  test('checkout offers online payment only when both Razorpay keys are set', async () => {
+    payer = (await call('/auth/register', { method: 'POST', body: { name: 'Online Payer', email: payerEmail, password: 'payer-password' } })).cookie;
+    await withRazorpay({ RAZORPAY_KEY_ID: 'rzp_test_FakeKey' }, async () => {
+      assert.equal((await call('/store')).body.store.onlinePayment, false);
+      assert.deepEqual((await placeOnline()).body, { error: 'Online payment isn’t available yet. Choose cash on delivery.' });
+    });
+    await withRazorpay(razorpayKeys, async () => {
+      assert.equal((await call('/store')).body.store.onlinePayment, true);
+    });
+  });
+
+  test('an order paid online waits for its payment, and is paid once Razorpay’s signed payment checks out', async () => {
+    await withRazorpay(razorpayKeys, async fake => {
+      const placed = await placeOnline();
+      assert.equal(placed.status, 201);
+      const { order, payment } = placed.body;
+      assert.equal(order.paymentStatus, 'pending');
+      const razorpayOrder = payment.orderId;
+      assert.match(razorpayOrder, /^order_Fake/);
+      assert.deepEqual(payment, {
+        keyId: 'rzp_test_FakeKey', orderId: razorpayOrder, amount: order.total * 100, currency: 'INR', description: `Order #${order.id}`,
+        prefill: { name: delivery.name, email: payerEmail, contact: delivery.phone },
+      });
+      assert.deepEqual(fake.calls, [{
+        method: 'POST', path: '/orders', body: { amount: order.total * 100, currency: 'INR', receipt: order.id, notes: { order: order.id } },
+        auth: `Basic ${Buffer.from('rzp_test_FakeKey:fake-key-secret').toString('base64')}`,
+      }]);
+
+      const pay = (id = order.id, as = payer) => call(`/orders/${id}/pay`, { method: 'POST', cookie: as, body: {} });
+      assert.equal((await pay()).body.payment.orderId, razorpayOrder, 'paying after closing the payment window uses the same Razorpay order');
+      assert.equal(fake.calls.length, 1);
+      assert.equal((await pay(order.id, cookie)).status, 404, 'someone else’s order');
+
+      const confirm = body => call(`/orders/${order.id}/payment`, { method: 'POST', cookie: payer, body });
+      fake.payments.set('pay_FakePaid01', { id: 'pay_FakePaid01', entity: 'payment', order_id: razorpayOrder, amount: order.total * 100, currency: 'INR', status: 'authorized' });
+      const paidWith = { razorpayPaymentId: 'pay_FakePaid01', razorpaySignature: sign('fake-key-secret', `${razorpayOrder}|pay_FakePaid01`) };
+      for (const body of [
+        {},
+        { ...paidWith, razorpaySignature: 'abc' },
+        { ...paidWith, razorpaySignature: sign('fake-key-secret', 'order_Elsewhere|pay_FakePaid01') },
+        { ...paidWith, razorpaySignature: sign('another-secret', `${razorpayOrder}|pay_FakePaid01`) },
+      ]) {
+        assert.equal((await confirm(body)).status, 400, JSON.stringify(body));
+      }
+      assert.equal((await call(`/orders/${order.id}`, { cookie: payer })).body.order.paymentStatus, 'pending', 'still waiting');
+
+      const paid = await confirm(paidWith);
+      assert.equal(paid.status, 200);
+      assert.equal(paid.body.order.paymentStatus, 'paid');
+      assert.equal(fake.payments.get('pay_FakePaid01').status, 'captured', 'a payment Razorpay only authorized is captured');
+      assert.equal((await confirm(paidWith)).status, 200, 'reporting it twice is harmless');
+      assert.deepEqual((await pay()).body, { error: 'This order is already paid.' });
+      const { order: seenByAdmin } = (await call(`/admin/orders/${order.id}`, { cookie })).body;
+      assert.deepEqual([seenByAdmin.paymentStatus, seenByAdmin.paymentId], ['paid', 'pay_FakePaid01']);
+
+      // A payment that isn't the order's full amount doesn't pay it.
+      const other = (await placeOnline()).body;
+      fake.payments.set('pay_FakeShort1', { id: 'pay_FakeShort1', order_id: other.payment.orderId, amount: 100, currency: 'INR', status: 'captured' });
+      const short = await call(`/orders/${other.order.id}/payment`, {
+        method: 'POST', cookie: payer, body: { razorpayPaymentId: 'pay_FakeShort1', razorpaySignature: sign('fake-key-secret', `${other.payment.orderId}|pay_FakeShort1`) },
+      });
+      assert.equal(short.status, 409);
+      assert.equal((await call(`/orders/${other.order.id}`, { cookie: payer })).body.order.paymentStatus, 'pending');
+
+      // A cash-on-delivery order has nothing to pay online.
+      const cod = (await call('/orders', { method: 'POST', cookie: payer, body: { items: [{ id: 6, quantity: 1 }], delivery, paymentMethod: 'cod' } })).body.order;
+      assert.equal(cod.paymentStatus, 'cod');
+      assert.deepEqual((await pay(cod.id)).body, { error: 'This order is paid in cash on delivery.' });
+
+      // If Razorpay can't make its order, the order isn't kept and its items go back in stock.
+      const stock = async () => (await call('/products/6')).body.product.stock;
+      const [stockBeforeFailure, ordersBeforeFailure] = [await stock(), (await call('/orders', { cookie: payer })).body.orders.length];
+      fake.failing = true;
+      assert.deepEqual((await placeOnline()).body, { error: 'We couldn’t start the online payment. Try again in a moment, or choose cash on delivery.' });
+      assert.equal(await stock(), stockBeforeFailure);
+      assert.equal((await call('/orders', { cookie: payer })).body.orders.length, ordersBeforeFailure);
+    });
+  });
+
+  test('Razorpay’s signed webhook marks an order paid when the customer never came back to the store', async () => {
+    await withRazorpay(razorpayKeys, async fake => {
+      const { order, payment } = (await placeOnline([{ id: 6, quantity: 1 }])).body;
+      const event = { entity: 'event', event: 'payment.captured', payload: { payment: { entity: { id: 'pay_FakeHook01', order_id: payment.orderId, amount: payment.amount, currency: 'INR', status: 'captured' } } } };
+      const raw = JSON.stringify(event);
+      const webhook = (signature, body = raw) =>
+        fetch(`${base}/payments/razorpay/webhook`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Razorpay-Signature': signature }, body }).then(response => response.status);
+      const paymentStatus = async () => (await call(`/orders/${order.id}`, { cookie: payer })).body.order.paymentStatus;
+
+      assert.equal(await webhook(sign('another-secret', raw)), 400);
+      assert.equal(await webhook(sign('fake-webhook-secret', raw), raw.replace('"amount":', '"amount": ')), 400, 'the signature covers the exact body');
+      assert.equal(await paymentStatus(), 'pending');
+      assert.equal(await webhook(sign('fake-webhook-secret', raw)), 200);
+      assert.equal(await paymentStatus(), 'paid');
+      assert.equal(await webhook(sign('fake-webhook-secret', raw)), 200, 'Razorpay sending it again is harmless');
+      const failed = JSON.stringify({ entity: 'event', event: 'payment.failed', payload: {} });
+      assert.equal(await webhook(sign('fake-webhook-secret', failed), failed), 200, 'other events are acknowledged and ignored');
+      assert.equal(fake.calls.length, 1, 'only placing the order called Razorpay');
+
+      delete process.env.RAZORPAY_WEBHOOK_SECRET;
+      assert.equal(await webhook(sign('fake-webhook-secret', raw)), 503, 'no webhook secret, no webhook');
+    });
   });
 
   test('a forgotten password is reset once from the emailed link, which signs out everywhere else', async () => {

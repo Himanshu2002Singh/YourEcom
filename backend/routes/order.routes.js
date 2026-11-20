@@ -10,5 +10,7 @@ router.post('/', requireUser, rateLimit({ limit: 20, windowMs: 10 * 60_000 }), o
 router.get('/', requireUser, orders.listOrders);
 router.get('/:id', requireUser, orders.getOrder);
 router.post('/:id/cancel', requireUser, orders.cancelOrder);
+router.post('/:id/pay', requireUser, rateLimit({ limit: 30, windowMs: 10 * 60_000 }), orders.payOrder);
+router.post('/:id/payment', requireUser, rateLimit({ limit: 30, windowMs: 10 * 60_000 }), orders.confirmPayment);
 
 export default router;
